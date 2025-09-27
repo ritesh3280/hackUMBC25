@@ -3,11 +3,21 @@ from fastapi.responses import StreamingResponse
 import asyncio
 import json
 
+# For PPG inlet
+from pylsl import StreamInlet, resolve_byprop
+
 from eeg.inference import EEGMoodDetector
 
 app = FastAPI()
 detector = EEGMoodDetector(window_sec=6.0)
 detector.run()
+
+# Setup PPG inlet for heart rate streaming
+try:
+    ppg_streams = resolve_byprop('type', 'PPG', timeout=5)
+    ppg_inlet = StreamInlet(ppg_streams[0], max_chunklen=256) if ppg_streams else None
+except Exception:
+    ppg_inlet = None
 
 async def event_generator():
     while not detector.available:
@@ -25,6 +35,32 @@ async def event_generator():
 async def stream():
     return StreamingResponse(event_generator(),
                              media_type="text/event-stream")
+
+@app.get("/raw_eeg")
+async def raw_eeg():
+    async def raw_eeg_generator():
+        while not detector.available:
+            await asyncio.sleep(0.1)
+        while True:
+            with detector._lock:
+                if detector.buf:
+                    sample = detector.buf[-1].tolist()
+                    yield f"data: {json.dumps({'eeg': sample})}\n\n"
+            await asyncio.sleep(0)
+    return StreamingResponse(raw_eeg_generator(), media_type="text/event-stream")
+
+@app.get("/heart_rate")
+async def heart_rate():
+    async def heart_rate_generator():
+        while ppg_inlet is None:
+            await asyncio.sleep(0.1)
+        while True:
+            chunk, _ = ppg_inlet.pull_chunk(timeout=1.0, max_samples=1)
+            if chunk:
+                hr = float(chunk[0][0])
+                yield f"data: {json.dumps({'hr': hr})}\n\n"
+            await asyncio.sleep(0)
+    return StreamingResponse(heart_rate_generator(), media_type="text/event-stream")
 
 @app.on_event("shutdown")
 def shutdown():
