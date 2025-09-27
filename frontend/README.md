@@ -1,36 +1,111 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# FocusFlow - Brain-Aware Productivity App
+
+A clean scaffold for a brain-aware productivity app built with Next.js, Tailwind CSS, and modern web technologies.
+
+## Features
+
+- **Session Page**: 3-column responsive layout with task management, timer, and live focus tracking
+- **History Page**: Analytics and session history with charts
+- **Top Bar**: App branding, focus status indicator, EEG connection status, and navigation
+- **Responsive Design**: Works on desktop and mobile devices
+- **Dark Mode**: Automatic dark/light mode support
+
+## Tech Stack
+
+- **Next.js 15** - React framework
+- **Tailwind CSS v4** - Utility-first CSS framework
+- **Geist Font** - Modern typography
+- **Responsive Grid** - Mobile-first design
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- Node.js 18+ 
+- npm or yarn
+
+### Installation
+
+1. **Install dependencies:**
+   ```bash
+   npm install
+   ```
+
+2. **Start development server:**
+   ```bash
+   npm run dev
+   ```
+
+3. **Open your browser:**
+   Navigate to [http://localhost:3000](http://localhost:3000)
+
+### Available Scripts
+
+- `npm run dev` - Start development server
+- `npm run build` - Build for production
+- `npm run start` - Start production server
+- `npm run lint` - Run ESLint
+
+## Project Structure
+
+```
+src/
+├── app/
+│   ├── layout.js          # Root layout with top bar
+│   ├── page.js           # Session page (main)
+│   ├── history/
+│   │   └── page.js       # History page
+│   └── globals.css        # Global styles with Tailwind
+├── components/            # React components (to be added)
+├── store/                 # State management (to be added)
+├── hooks/                 # Custom hooks (to be added)
+└── db/                    # Database layer (to be added)
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Pages
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+### Session Page (`/`)
+- **Left Column**: TaskList placeholder for task management
+- **Center Column**: TimerRing and Controls for focus sessions
+- **Right Column**: LiveTimeline and SessionStats for real-time feedback
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### History Page (`/history`)
+- **Charts Section**: Focus distribution and task performance
+- **Sessions Table**: Recent session data with analytics
 
-## Learn More
+## Top Bar Features
 
-To learn more about Next.js, take a look at the following resources:
+- **App Name**: FocusFlow branding
+- **Status Pill**: Shows current focus state (Focused/Unfocused)
+- **EEG Indicator**: Connection status dot
+- **Navigation**: Links to Session and History pages
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Styling
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+The app uses a minimal, neutral design with:
+- Custom CSS variables for theming
+- Responsive breakpoints (mobile-first)
+- Dark mode support
+- Focus/unfocus color coding (green/red)
+- Clean typography with Geist fonts
 
-## Deploy on Vercel
+## Next Steps
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+This scaffold provides the foundation for building a full brain-aware productivity app. Future development can include:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. **State Management**: Zustand store for session data
+2. **Database**: Dexie for IndexedDB persistence  
+3. **EEG Integration**: Mock WebSocket for brain data
+4. **Components**: TaskList, TimerRing, Controls, etc.
+5. **Analytics**: Recharts for data visualization
+
+## Development
+
+The app is ready for development with:
+- ✅ Tailwind CSS configured
+- ✅ Responsive layout structure
+- ✅ Navigation between pages
+- ✅ Placeholder components
+- ✅ Clean, minimal styling
+
+Start building your brain-aware productivity features on this solid foundation!
