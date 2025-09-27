@@ -1,0 +1,52 @@
+# def demo_alarms():
+#     """Demonstrate different alarm types with sample data"""
+#     print("=== Smart Alarm System Demo ===\n")
+    
+#     # Configuration
+#     config = AlarmConfig(
+#         window_size=10,
+#         threshold=0.4,
+#         min_dwell_time=2.0,
+#         ema_alpha=0.2,
+#         hysteresis_margin=0.2
+#     )
+    
+#     # Create different alarm types
+#     sliding_alarm = SlidingWindowAlarm(config)
+#     debounced_alarm = DebouncedAlarm(config)
+#     ema_alarm = EMAAlarm(config)
+#     smart_alarm = SmartAlarm(config)
+    
+#     # Sample data: simulate focus states over time
+#     # 1 = focused, 0 = unfocused
+#     sample_data = [
+#         1, 1, 1, 0, 0, 1, 1, 0, 0, 0,  # Mixed pattern
+#         0, 0, 0, 0, 0, 1, 1, 1, 1, 1,  # Long unfocused then focused
+#         1, 1, 0, 1, 0, 1, 0, 1, 0, 0   # Rapid switching
+#     ]
+    
+#     print("Simulating focus data:", sample_data)
+#     print("\nAlarm responses:")
+#     print("-" * 60)
+    
+#     for i, state in enumerate(sample_data):
+#         print(f"\nStep {i+1}: State = {state}")
+        
+#         # Update all alarms
+#         sliding_result = sliding_alarm.update(state)
+#         time.sleep(0.1)  # Small delay for dwell time demo
+#         debounced_result = debounced_alarm.update(state)
+#         ema_result = ema_alarm.update(state)
+#         smart_result = smart_alarm.update(state)
+        
+#         # Show status
+#         print(f"  Sliding Window: {'🚨' if sliding_result else '✅'} "
+#               f"(Focus: {sliding_alarm.get_focus_percentage():.2f})")
+#         print(f"  Debounced:      {'🚨' if debounced_result else '✅'}")
+#         print(f"  EMA:            {'🚨' if ema_result else '✅'} "
+#               f"(Score: {ema_alarm.get_ema_score():.3f})")
+#         print(f"  Smart Hybrid:   {'🚨' if smart_result else '✅'}")
+
+
+# if __name__ == "__main__":
+#     demo_alarms()
