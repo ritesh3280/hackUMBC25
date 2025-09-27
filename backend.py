@@ -10,8 +10,13 @@ detector = EEGMoodDetector(window_sec=6.0)
 detector.run()
 
 async def event_generator():
+    while not detector.available:
+        await asyncio.sleep(0.5)
     while True:
         label, probs = detector.infer_latest(verbose=False)
+        if label is None:
+            await asyncio.sleep(1.0)
+            continue
         payload = {"label": label, "probs": probs}
         yield f"data: {json.dumps(payload)}\n\n"
         await asyncio.sleep(1.0)
