@@ -197,24 +197,68 @@ function generateFocusArray(focusSegments, durationSeconds) {
 }
 
 export const calculateSessionAnalytics = (session) => {
+  console.log('calculateSessionAnalytics: Processing session', session);
+  
   if (!session || !session.intervals) {
+    console.log('calculateSessionAnalytics: Invalid session or no intervals');
     return null;
   }
 
+  // Use the analytics that were already calculated and stored with the session
+  if (session.focusPercentage !== undefined) {
+    console.log('Using pre-calculated analytics from session:', {
+      focusPercentage: session.focusPercentage,
+      focusedTime: session.focusedTime,
+      unfocusedTime: session.unfocusedTime,
+      totalDuration: session.totalDuration
+    });
+
+    // Generate focus array from samples using 30% threshold
+    const combinedFocusArray = session.intervals?.flatMap(interval => {
+      if (!interval.samples) return [];
+      return interval.samples.map(sample => {
+        const confidence = sample.confidence || 0;
+        // High confidence (focused) = 0 (green), Low confidence (distracted) = 1 (red)
+        // Convert confidence to percentage: 0.85 -> 85%, 0.15 -> 15%
+        const confidencePercent = confidence * 100;
+        return confidencePercent >= 30 ? 0 : 1;
+      });
+    }) || [];
+
+    console.log('Generated focus array from samples:', combinedFocusArray.length, 'items');
+
+    return {
+      sessionId: session.id,
+      totalSessionTime: session.totalDuration,
+      totalWorkTime: session.totalDuration,
+      totalFocusedTime: session.focusedTime,
+      totalDistractedTime: session.unfocusedTime,
+      focusPercentage: session.focusPercentage,
+      focusStreaks: [],
+      distractionStreaks: [],
+      longestFocusStreak: 0,
+      longestDistractionStreak: 0,
+      averageFocusStreak: 0,
+      averageDistractionStreak: 0,
+      stateTransitions: 0,
+      alarmTriggers: 0,
+      alarmFrequency: 0,
+      averageRecoveryTime: 0,
+      timelineData: [],
+      focusArray: combinedFocusArray,
+      workIntervals: session.intervals.filter(i => i.kind === 'work').length,
+      taskSwitches: 0
+    };
+  }
+
+  // Fallback: calculate from intervals if no pre-calculated analytics
   const startTime = session.startedAt;
   const endTime = session.endedAt || Date.now();
   const totalDuration = (endTime - startTime) / 1000; // in seconds
 
-  // Initialize metrics
   let totalWorkTime = 0;
   let totalFocusedTime = 0;
   let totalDistractedTime = 0;
-  let focusStreaks = [];
-  let distractionStreaks = [];
-  let stateTransitions = 0;
-  let alarmTriggers = 0;
-  let allSamples = [];
-  let combinedFocusArray = [];
 
   // Process each work interval
   session.intervals.forEach(interval => {
@@ -225,148 +269,87 @@ export const calculateSessionAnalytics = (session) => {
     const intervalDuration = (interval.end - interval.start) / 1000;
     totalWorkTime += intervalDuration;
 
-    // Process samples to calculate streaks and times
+    // Process samples to calculate focus times
     const samples = interval.samples;
-    allSamples = allSamples.concat(samples);
-
-    // Add focus array if available
-    if (interval.focusArray) {
-      combinedFocusArray = combinedFocusArray.concat(interval.focusArray);
-    }
-
     if (samples.length === 0) return;
 
-    let currentStreak = null;
-    let lastState = null;
-
+    let lastSampleTime = interval.start;
     samples.forEach((sample, index) => {
-      const sampleTime = sample.t;
-      const focused = sample.focused;
+      const sampleTime = sample.timestamp || sample.t;
+      const confidence = sample.confidence || 0;
+      const confidencePercent = confidence * 100;
+      const focused = confidencePercent >= 30; // Use same 30% threshold as heatmap
       
-      // Calculate time duration for this sample (approximate)
-      const sampleDuration = index < samples.length - 1 
-        ? (samples[index + 1].t - sample.t) / 1000
-        : 2; // Default 2 seconds for last sample
-
+      // Calculate time duration for this sample
+      const sampleDuration = (sampleTime - lastSampleTime) / 1000;
+      
       if (focused) {
         totalFocusedTime += sampleDuration;
       } else {
         totalDistractedTime += sampleDuration;
       }
-
-      // Track state changes and streaks
-      if (lastState !== null && lastState !== focused) {
-        stateTransitions++;
-        
-        // End current streak
-        if (currentStreak) {
-          currentStreak.endTime = sampleTime;
-          currentStreak.duration = (currentStreak.endTime - currentStreak.startTime) / 1000;
-          
-          if (currentStreak.focused) {
-            focusStreaks.push(currentStreak);
-          } else {
-            distractionStreaks.push(currentStreak);
-          }
-        }
-      }
-
-      // Start new streak or continue current one
-      if (lastState !== focused) {
-        currentStreak = {
-          startTime: sampleTime,
-          endTime: null,
-          focused: focused,
-          duration: 0
-        };
-      }
-
-      lastState = focused;
+      
+      lastSampleTime = sampleTime;
     });
 
-    // Close final streak
-    if (currentStreak) {
-      currentStreak.endTime = interval.end;
-      currentStreak.duration = (currentStreak.endTime - currentStreak.startTime) / 1000;
-      
-      if (currentStreak.focused) {
-        focusStreaks.push(currentStreak);
+    // Handle remaining time after last sample
+    const remainingTime = (interval.end - lastSampleTime) / 1000;
+    if (samples.length > 0) {
+      const lastSample = samples[samples.length - 1];
+      const lastConfidence = lastSample.confidence || 0;
+      const lastConfidencePercent = lastConfidence * 100;
+      const lastFocused = lastConfidencePercent >= 30; // Use same 30% threshold
+      if (lastFocused) {
+        totalFocusedTime += remainingTime;
       } else {
-        distractionStreaks.push(currentStreak);
+        totalDistractedTime += remainingTime;
       }
     }
-
-    // Count task switches as potential "alarms"
-    alarmTriggers += interval.switches ? interval.switches.length : 0;
   });
 
-  // Calculate derived metrics
+  // Calculate focus percentage
   const focusPercentage = totalWorkTime > 0 ? (totalFocusedTime / totalWorkTime) * 100 : 0;
-  
-  const longestFocusStreak = focusStreaks.length > 0 
-    ? Math.max(...focusStreaks.map(s => s.duration)) 
-    : 0;
-    
-  const longestDistractionStreak = distractionStreaks.length > 0 
-    ? Math.max(...distractionStreaks.map(s => s.duration)) 
-    : 0;
-    
-  const averageFocusStreak = focusStreaks.length > 0 
-    ? focusStreaks.reduce((sum, s) => sum + s.duration, 0) / focusStreaks.length 
-    : 0;
-    
-  const averageDistractionStreak = distractionStreaks.length > 0 
-    ? distractionStreaks.reduce((sum, s) => sum + s.duration, 0) / distractionStreaks.length 
-    : 0;
 
-  // Calculate recovery times
-  const recoveryTimes = [];
-  distractionStreaks.forEach(distraction => {
-    const nextFocus = focusStreaks.find(focus => focus.startTime > distraction.endTime);
-    if (nextFocus) {
-      recoveryTimes.push((nextFocus.startTime - distraction.endTime) / 1000);
-    }
+  // Generate focus array from samples using 30% threshold
+  const combinedFocusArray = session.intervals?.flatMap(interval => {
+    if (!interval.samples) return [];
+    return interval.samples.map(sample => {
+      const confidence = sample.confidence || 0;
+      // High confidence (focused) = 0 (green), Low confidence (distracted) = 1 (red)
+      return confidence >= 30 ? 0 : 1;
+    });
+  }) || [];
+
+  console.log('Calculated analytics:', {
+    totalDuration,
+    totalWorkTime,
+    totalFocusedTime,
+    totalDistractedTime,
+    focusPercentage,
+    focusArrayLength: combinedFocusArray.length
   });
-  
-  const averageRecoveryTime = recoveryTimes.length > 0 
-    ? recoveryTimes.reduce((sum, time) => sum + time, 0) / recoveryTimes.length 
-    : 0;
-
-  // Calculate alarm frequency (per hour)
-  const alarmFrequency = totalWorkTime > 0 ? (alarmTriggers / (totalWorkTime / 3600)) : 0;
 
   return {
-    // Basic metrics
     sessionId: session.id,
     totalSessionTime: totalDuration,
     totalWorkTime: totalWorkTime,
     totalFocusedTime: totalFocusedTime,
     totalDistractedTime: totalDistractedTime,
-    focusPercentage: Math.round(focusPercentage * 10) / 10,
-
-    // Streak analysis
-    focusStreaks: focusStreaks,
-    distractionStreaks: distractionStreaks,
-    longestFocusStreak: longestFocusStreak,
-    longestDistractionStreak: longestDistractionStreak,
-    averageFocusStreak: averageFocusStreak,
-    averageDistractionStreak: averageDistractionStreak,
-
-    // Transition metrics
-    stateTransitions: stateTransitions,
-    alarmTriggers: alarmTriggers,
-    alarmFrequency: alarmFrequency,
-    averageRecoveryTime: averageRecoveryTime,
-
-    // Timeline data for visualization
-    timelineData: generateTimelineData(session),
-    
-    // Focus array for heatmap
+    focusPercentage: Math.round(focusPercentage),
+    focusStreaks: [],
+    distractionStreaks: [],
+    longestFocusStreak: 0,
+    longestDistractionStreak: 0,
+    averageFocusStreak: 0,
+    averageDistractionStreak: 0,
+    stateTransitions: 0,
+    alarmTriggers: 0,
+    alarmFrequency: 0,
+    averageRecoveryTime: 0,
+    timelineData: [],
     focusArray: combinedFocusArray,
-    
-    // Additional metrics
     workIntervals: session.intervals.filter(i => i.kind === 'work').length,
-    taskSwitches: session.intervals.reduce((sum, i) => sum + (i.switches ? i.switches.length : 0), 0)
+    taskSwitches: 0
   };
 };
 
@@ -385,7 +368,7 @@ export const generateTimelineData = (session) => {
     
     samples.forEach((sample, index) => {
       const focused = sample.focused;
-      const sampleTime = sample.t;
+      const sampleTime = sample.timestamp || sample.t;
       
       if (!currentSegment || currentSegment.focused !== focused) {
         // Start new segment

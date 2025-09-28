@@ -3,66 +3,6 @@
 import { useMemo, useState } from 'react';
 import { formatDuration, formatTime } from '../utils/sessionAnalytics';
 
-export function TimelineChart({ timelineData, totalDuration, className = "" }) {
-  const segments = useMemo(() => {
-    if (!timelineData || timelineData.length === 0) return [];
-    
-    return timelineData.map(segment => ({
-      ...segment,
-      widthPercent: (segment.duration / totalDuration) * 100,
-      leftPercent: (segment.relativeStart / totalDuration) * 100
-    }));
-  }, [timelineData, totalDuration]);
-
-  if (!timelineData || timelineData.length === 0) {
-    return (
-      <div className={`bg-gray-100 rounded-lg p-4 text-center text-gray-500 ${className}`}>
-        No timeline data available
-      </div>
-    );
-  }
-
-  return (
-    <div className={className}>
-      <div className="mb-4">
-        <h4 className="text-sm font-medium text-gray-700 mb-2">Focus Timeline</h4>
-        <div className="relative h-8 bg-gray-200 rounded-lg overflow-hidden">
-          {segments.map((segment, index) => (
-            <div
-              key={index}
-              className={`absolute h-full transition-all duration-300 ${
-                segment.focused 
-                  ? 'bg-green-500 hover:bg-green-600' 
-                  : 'bg-red-500 hover:bg-red-600'
-              }`}
-              style={{
-                left: `${segment.leftPercent}%`,
-                width: `${segment.widthPercent}%`
-              }}
-              title={`${segment.focused ? 'Focused' : 'Distracted'} - ${formatDuration(segment.duration)}`}
-            />
-          ))}
-        </div>
-        <div className="flex justify-between text-xs text-gray-500 mt-1">
-          <span>0:00</span>
-          <span>{formatDuration(totalDuration)}</span>
-        </div>
-      </div>
-      
-      {/* Legend */}
-      <div className="flex items-center justify-center space-x-4 text-xs">
-        <div className="flex items-center space-x-1">
-          <div className="w-3 h-3 bg-green-500 rounded"></div>
-          <span className="text-gray-600">Focused</span>
-        </div>
-        <div className="flex items-center space-x-1">
-          <div className="w-3 h-3 bg-red-500 rounded"></div>
-          <span className="text-gray-600">Distracted</span>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 export function PieChart({ focusedTime, distractedTime, className = "" }) {
   const total = focusedTime + distractedTime;

@@ -34,6 +34,9 @@ export default function SessionPage() {
   } = useSessionStore();
 
   const { connected, latestSample, eegData, heartRate, focusHistory, subscribe } = useRealEEG();
+  
+  // Alarm mute state
+  const [alarmMuted, setAlarmMuted] = useState(false);
 
   // Memoize focus data for stable chart rendering with sliding window
   const focusChartData = useMemo(() => {
@@ -255,11 +258,14 @@ export default function SessionPage() {
                 onPause={handlePause}
                 onReset={reset}
                 onSkipBreak={handleSkipBreak}
+                onEndSession={endSession}
                 onSwitchTask={handleSwitchTask}
                 preset={preset}
                 onPresetChange={handlePresetChange}
                 adaptive={adaptive}
                 onAdaptiveChange={handleAdaptiveChange}
+                alarmMuted={alarmMuted}
+                onAlarmMuteToggle={() => setAlarmMuted(!alarmMuted)}
               />
             </div>
           </div>
@@ -315,8 +321,8 @@ export default function SessionPage() {
             {/* Hidden Focus Alarm - still works but no visual card */}
             <FocusAlarm 
               focusHistory={focusHistory}
-              isEnabled={connected}
-              hidden={true}
+              isEnabled={connected && !alarmMuted}
+              hidden={alarmMuted}
             />
 
             <SessionStats

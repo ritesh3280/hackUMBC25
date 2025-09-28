@@ -26,14 +26,91 @@ export default function FocusAlarm({ focusHistory, isEnabled = true, hidden = fa
   const emaScoreRef = useRef(0.5);
   const lastSwitchTimeRef = useRef(Date.now());
   const initializedRef = useRef(false);
+  const audioContextRef = useRef(null);
 
-  // Initialize notification permission
+  // Initialize notification permission and audio context
   useEffect(() => {
     // Request notification permission
     if (Notification.permission === 'default') {
       Notification.requestPermission();
     }
+    
+    // Initialize audio context on first user interaction
+    const initAudio = () => {
+      if (!audioContextRef.current) {
+        try {
+          audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+          console.log('🔊 Audio context initialized');
+        } catch (error) {
+          console.warn('Could not initialize audio context:', error);
+        }
+      }
+    };
+    
+    // Initialize on any user interaction
+    const events = ['click', 'keydown', 'touchstart'];
+    events.forEach(event => {
+      document.addEventListener(event, initAudio, { once: true });
+    });
+    
+    return () => {
+      events.forEach(event => {
+        document.removeEventListener(event, initAudio);
+      });
+    };
   }, []);
+
+  // Function to trigger alarm sound
+  const triggerAlarmSound = useCallback(() => {
+    try {
+      // Use the pre-initialized audio context
+      const audioContext = audioContextRef.current;
+      
+      if (!audioContext) {
+        console.warn('Audio context not initialized - user interaction required');
+        return;
+      }
+      
+      // Resume context if suspended (required for autoplay policies)
+      if (audioContext.state === 'suspended') {
+        audioContext.resume();
+      }
+      
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      
+      // Create a more noticeable alarm sound
+      oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
+      oscillator.frequency.setValueAtTime(1000, audioContext.currentTime + 0.1);
+      oscillator.frequency.setValueAtTime(800, audioContext.currentTime + 0.2);
+      
+      gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+      
+      oscillator.start(audioContext.currentTime);
+      oscillator.stop(audioContext.currentTime + 0.5);
+      
+      console.log('🔔 Alarm sound triggered via Web Audio API');
+    } catch (error) {
+      console.warn('Could not play alarm sound:', error);
+      // Fallback: try to use system beep
+      try {
+        // This might work in some browsers
+        console.log('\x07'); // ASCII bell character
+      } catch (fallbackError) {
+        console.warn('All audio methods failed:', fallbackError);
+      }
+    }
+  }, []);
+
+  // Test function for debugging
+  const testAlarmSound = useCallback(() => {
+    console.log('🧪 Testing alarm sound...');
+    triggerAlarmSound();
+  }, [triggerAlarmSound]);
 
   // Update alarm state based on focus data
   useEffect(() => {
@@ -77,6 +154,9 @@ export default function FocusAlarm({ focusHistory, isEnabled = true, hidden = fa
       setShowNotification(true);
       lastSwitchTimeRef.current = now;
       console.log(`🚨 FOCUS ALARM ON - EMA: ${emaScoreRef.current.toFixed(3)}, Dwell: ${timeSinceSwitch.toFixed(1)}s`);
+      
+      // Trigger alarm sound via GET request
+      triggerAlarmSound();
       
       // Show browser notification
       if (Notification.permission === 'granted') {

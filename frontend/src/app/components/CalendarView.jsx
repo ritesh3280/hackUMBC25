@@ -57,7 +57,17 @@ export function CalendarView({ sessions, analytics, onSessionSelect }) {
   const sessionsByDate = useMemo(() => {
     const grouped = {};
     
+    console.log('CalendarView processing sessions:', sessions.length);
+    console.log('CalendarView processing analytics:', analytics.length);
+    
     sessions.forEach((session, index) => {
+      console.log(`Processing session ${index}:`, {
+        id: session.id,
+        startedAt: session.startedAt,
+        date: new Date(session.startedAt),
+        intervals: session.intervals?.length || 0
+      });
+      
       const date = new Date(session.startedAt);
       const dateKey = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
       
@@ -67,13 +77,18 @@ export function CalendarView({ sessions, analytics, onSessionSelect }) {
       
       // Find the corresponding analytics
       const sessionAnalytic = analytics.find(a => a.sessionId === session.id);
+      console.log(`Found analytics for session ${session.id}:`, !!sessionAnalytic);
       
+      // Only add ONE entry per session, not per interval
       grouped[dateKey].push({
         session,
         analytics: sessionAnalytic,
         index
       });
     });
+    
+    console.log('Sessions grouped by date:', Object.keys(grouped).length, 'dates');
+    console.log('Grouped sessions:', grouped);
     
     return grouped;
   }, [sessions, analytics]);

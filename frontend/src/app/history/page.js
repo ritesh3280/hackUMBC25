@@ -1,8 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getAllSessions } from '../db/indexeddb';
-import { generateHardcodedSessions, calculateSessionAnalytics, formatDuration, formatDate, formatTime } from '../utils/sessionAnalytics';
+import { formatDuration, formatDate, formatTime, calculateSessionAnalytics } from '../utils/sessionAnalytics';
 import { TimelineChart, PieChart, BarChart, HeatmapChart, SessionHeatmap } from '../components/SessionVisualization';
 import { CalendarView } from '../components/CalendarView';
 import Link from 'next/link';
@@ -19,20 +18,47 @@ export default function HistoryPage() {
     loadSessions();
   }, []);
 
+  // Refresh sessions when page becomes visible (in case new session was added)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        loadSessions();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, []);
+
   const loadSessions = async () => {
     try {
-      // For now, use hardcoded data - replace with real data later
-      const hardcodedSessions = generateHardcodedSessions();
-      const allSessions = [...hardcodedSessions];
+      // Load sessions from localStorage only
+      const sessions = JSON.parse(localStorage.getItem('focusSessions') || '[]');
       
-      // Calculate analytics for each session
-      const sessionAnalytics = allSessions.map(session => calculateSessionAnalytics(session));
+      console.log('Raw sessions from localStorage:', sessions.length);
+      console.log('Sample session structure:', sessions[0]);
       
-      setSessions(allSessions);
+      // Sort by start time (newest first)
+      sessions.sort((a, b) => new Date(b.startedAt) - new Date(a.startedAt));
+      
+      // Calculate analytics for each session using the existing calculateSessionAnalytics function
+      const sessionAnalytics = sessions.map(session => {
+        const analytics = calculateSessionAnalytics(session);
+        if (analytics) {
+          // Ensure sessionId matches the session id
+          analytics.sessionId = session.id;
+        }
+        return analytics;
+      }).filter(analytics => analytics !== null);
+      
+      console.log('Processed sessions:', sessions.length);
+      console.log('Session analytics:', sessionAnalytics.length);
+      console.log('Sample session:', sessions[0]);
+      console.log('Sample analytics:', sessionAnalytics[0]);
+      
+      setSessions(sessions);
       setAnalytics(sessionAnalytics);
       
-      // Don't auto-select any session - let user click to open popup
-      // setSelectedSession(null) is already the default
     } catch (error) {
       console.error('Error loading sessions:', error);
     } finally {
@@ -41,13 +67,19 @@ export default function HistoryPage() {
   };
 
   const getOverallStats = () => {
+    console.log('Calculating overall stats with analytics:', analytics.length);
+    console.log('Analytics data:', analytics);
+    
     if (analytics.length === 0) return { totalSessions: 0, avgFocus: 0, totalTime: 0 };
     
     const totalSessions = analytics.length;
-    const avgFocus = analytics.reduce((sum, a) => sum + a.focusPercentage, 0) / totalSessions;
-    const totalTime = analytics.reduce((sum, a) => sum + a.totalWorkTime, 0);
+    const avgFocus = analytics.reduce((sum, a) => sum + (a.focusPercentage || 0), 0) / totalSessions;
+    const totalTime = analytics.reduce((sum, a) => sum + (a.totalWorkTime || a.totalDuration || 0), 0);
     
-    return { totalSessions, avgFocus, totalTime };
+    const stats = { totalSessions, avgFocus, totalTime };
+    console.log('Overall stats calculated:', stats);
+    
+    return stats;
   };
 
   if (loading) {
@@ -220,7 +252,7 @@ export default function HistoryPage() {
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
                           <div>
                             <SessionHeatmap 
-                              focusArray={selectedSession.focusArray}
+                              focusArray={selectedSession?.focusArray || []}
                             />
                           </div>
                           <div className="space-y-4">
@@ -231,50 +263,11 @@ export default function HistoryPage() {
                                 distractedTime={selectedSession.totalDistractedTime}
                               />
                             </div>
-                            <TimelineChart 
-                              timelineData={selectedSession.timelineData} 
-                              totalDuration={selectedSession.totalWorkTime}
-                            />
+                         
                           </div>
                         </div>
 
-                        {/* Streak Analysis */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mt-5 pt-5 border-t">
-                          <div className="space-y-3">
-                            <h4 className="font-medium text-gray-700">Focus Streaks</h4>
-                            <div className="space-y-2">
-                              <div className="flex justify-between text-sm">
-                                <span className="text-gray-600">Longest Streak</span>
-                                <span className="font-semibold text-gray-900">{formatDuration(selectedSession.longestFocusStreak)}</span>
-                              </div>
-                              <div className="flex justify-between text-sm">
-                                <span className="text-gray-600">Average Streak</span>
-                                <span className="font-semibold text-gray-900">{formatDuration(selectedSession.averageFocusStreak)}</span>
-                              </div>
-                              <div className="flex justify-between text-sm">
-                                <span className="text-gray-600">Total Streaks</span>
-                                <span className="font-semibold text-gray-900">{selectedSession.focusStreaks.length}</span>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="space-y-3">
-                            <h4 className="font-medium text-gray-700">Distraction Analysis</h4>
-                            <div className="space-y-2">
-                              <div className="flex justify-between text-sm">
-                                <span className="text-gray-600">Longest Distraction</span>
-                                <span className="font-semibold text-gray-900">{formatDuration(selectedSession.longestDistractionStreak)}</span>
-                              </div>
-                              <div className="flex justify-between text-sm">
-                                <span className="text-gray-600">Average Recovery</span>
-                                <span className="font-semibold text-gray-900">{formatDuration(selectedSession.averageRecoveryTime)}</span>
-                              </div>
-                              <div className="flex justify-between text-sm">
-                                <span className="text-gray-600">State Transitions</span>
-                                <span className="font-semibold text-gray-900">{selectedSession.stateTransitions}</span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
+                
                       </div>
                     </div>
                   </>
@@ -320,7 +313,7 @@ export default function HistoryPage() {
                     <div className="p-2 bg-green-50 rounded">
                       <div className="text-xs font-medium text-green-900">Maintain Streak</div>
                       <div className="text-xs text-green-700 mt-0.5">
-                        You've had 3 consecutive days with 80%+ focus. Keep it up!
+                        You&apos;ve had 3 consecutive days with 80%+ focus. Keep it up!
                       </div>
                     </div>
                     <div className="p-2 bg-yellow-50 rounded">
@@ -427,52 +420,13 @@ export default function HistoryPage() {
 
                     {/* Timeline Visualization */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                      <TimelineChart 
-                        timelineData={selectedSession.timelineData} 
-                        totalDuration={selectedSession.totalWorkTime}
-                      />
+                   
                       <SessionHeatmap 
                         focusArray={selectedSession.focusArray}
                       />
                     </div>
 
-                    {/* Streak Analysis */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                      <div className="space-y-3">
-                        <h4 className="font-medium text-gray-700">Focus Streaks</h4>
-                        <div className="space-y-2">
-                          <div className="flex justify-between text-sm">
-                            <span className="text-gray-600">Longest Streak</span>
-                            <span className="font-semibold text-gray-900">{formatDuration(selectedSession.longestFocusStreak)}</span>
-                          </div>
-                          <div className="flex justify-between text-sm">
-                            <span className="text-gray-600">Average Streak</span>
-                            <span className="font-semibold text-gray-900">{formatDuration(selectedSession.averageFocusStreak)}</span>
-                          </div>
-                          <div className="flex justify-between text-sm">
-                            <span className="text-gray-600">Total Streaks</span>
-                            <span className="font-semibold text-gray-900">{selectedSession.focusStreaks.length}</span>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="space-y-3">
-                        <h4 className="font-medium text-gray-700">Distraction Analysis</h4>
-                        <div className="space-y-2">
-                          <div className="flex justify-between text-sm">
-                            <span className="text-gray-600">Longest Distraction</span>
-                            <span className="font-semibold text-gray-900">{formatDuration(selectedSession.longestDistractionStreak)}</span>
-                          </div>
-                          <div className="flex justify-between text-sm">
-                            <span className="text-gray-600">Average Recovery</span>
-                            <span className="font-semibold text-gray-900">{formatDuration(selectedSession.averageRecoveryTime)}</span>
-                          </div>
-                          <div className="flex justify-between text-sm">
-                            <span className="text-gray-600">State Transitions</span>
-                            <span className="font-semibold text-gray-900">{selectedSession.stateTransitions}</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
+           
                   </div>
                 )}
 
