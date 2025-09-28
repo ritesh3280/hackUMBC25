@@ -10,6 +10,7 @@ import time
 import websockets
 from randomforestinference import EEGMoodDetector
 from pylsl import StreamInlet, resolve_byprop
+from heartpy import process as hp_process
 
 class EEGWebSocketServer:
     def __init__(self):
@@ -83,7 +84,18 @@ class EEGWebSocketServer:
             if self.ppg_inlet:
                 chunk, _ = self.ppg_inlet.pull_chunk(timeout=0.1, max_samples=1)
                 if chunk:
-                    hr = float(chunk[0][0])
+                    for sample in chunk:
+                        self.ppg_buffer.append(sample[0])
+
+                    if len(self.ppg_buffer) == self.ppg_buffer.maxlen:
+                        try:
+                            wd, metrics = hp_process(
+                                list(self.ppg_buffer),
+                                sample_rate=self.ppg_fs
+                            )
+                            hr = metrics['bpm']
+                        except Exception:
+                            hr = None
             
             return {
                 "timestamp": int(time.time() * 1000),
