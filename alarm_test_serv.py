@@ -10,8 +10,8 @@ from alarm import SmartAlarm, AlarmConfig
 config = AlarmConfig(
     window_size=30,
     threshold=0.4,
-    min_dwell_time=3.0,   # More stable for real use
-    ema_alpha=0.15,       # Balanced EMA reaction
+    min_dwell_time=1.0,   # More stable for real use
+    ema_alpha=0.2,       # Balanced EMA reaction
     hysteresis_margin=0.15
 )
 
@@ -292,18 +292,18 @@ if __name__ == "__main__":
         print("  uvicorn backend:app --reload --host 0.0.0.0 --port 8000")
         print()
         
-        try:
-            # Test connection first
-            test_response = requests.get(BACKEND_URL, stream=True, timeout=5)
-            test_response.raise_for_status()
-            test_response.close()  # Close the test connection
-            
-            # If successful, create the actual stream generator
-            stream_generator = connect_to_backend_stream()
-        except Exception as e:
-            print(f"\n❌ Failed to connect to backend: {e}")
-            print("\nFalling back to MOCK DATA mode...")
-            stream_generator = generate_mock_focus_stream(testArray1, update_interval=0.2)
+        # try:
+        # Test connection first
+        test_response = requests.get(BACKEND_URL, stream=True, timeout=5)
+        test_response.raise_for_status()
+        test_response.close()  # Close the test connection
+        
+        # If successful, create the actual stream generator
+        stream_generator = connect_to_backend_stream()
+        # except Exception as e:
+        #     print(f"\n❌ Failed to connect to backend: {e}")
+        #     print("\nFalling back to MOCK DATA mode...")
+        #     stream_generator = generate_mock_focus_stream(testArray1, update_interval=0.2)
     
     print("\n" + "="*50)
     print("Starting alarm monitoring...")

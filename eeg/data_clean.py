@@ -59,7 +59,7 @@ def save_outputs(X, y, labels, window_dur, step_dur, sampling_rate):
 def main():
     parser = argparse.ArgumentParser(description="Clean and extract EEG features.")
     parser.add_argument('--skip', nargs='*', default=['sleeping'], help='Emotions to skip')
-    parser.add_argument('--window', type=float, default=6.0, help='Window length in sec')
+    parser.add_argument('--window', type=float, default=8.0, help='Window length in sec')
     parser.add_argument('--step', type=float, default=1.0, help='Step length in sec')
     parser.add_argument('--fs', type=int, default=256, help='Sampling rate')
     args = parser.parse_args()

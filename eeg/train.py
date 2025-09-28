@@ -43,7 +43,7 @@ def run_training():
     X = np.load('X.npy')
     y = np.load('y.npy')
 
-    feat_params = {'window_sec': 6.0, 'step_sec': 1.0, 'fs': 256}
+    feat_params = {'window_sec': 8.0, 'step_sec': 1.0, 'fs': 256}
     try:
         with open('feature_params.json', 'r') as f:
             feat_params.update(json.load(f))
@@ -125,7 +125,7 @@ def run_training():
                 json.dump({int(k): v for k, v in emotion_map.items()}, f)
             with open('inference_config.json', 'w') as f:
                 json.dump({
-                    'window_sec': feat_params.get('window_sec', 6.0),
+                    'window_sec': feat_params.get('window_sec', 8.0),
                     'step_sec': feat_params.get('step_sec', 1.0),
                     'fs': feat_params.get('fs', 256)
                 }, f)

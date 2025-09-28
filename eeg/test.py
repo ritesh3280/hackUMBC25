@@ -63,7 +63,7 @@ def run_inference():
         
     stream_thread = ensure_stream()
 
-    window_sec, step_sec = 6.0, 1.0
+    window_sec, step_sec = 8.0, 1.0
     try:
         with open('inference_config.json', 'r') as f:
             cfg = json.load(f)
