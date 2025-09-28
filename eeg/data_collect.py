@@ -5,13 +5,39 @@ import asyncio
 import threading
 import time
 import numpy as np
-from muselsl import stream, list_muses
+from muselsl import stream as muse_stream, list_muses
 from pylsl import StreamInlet, resolve_byprop
 
 DEFAULT_DURATION = 600
 PPG_MAX_SAMPLES = 64
 EEG_MAX_SAMPLES = 256
 STREAM_TIMEOUT = 20
+    
+def ensure_stream():
+    """Ensure an EEG LSL stream exists. If not, start muselsl in a background thread."""
+    streams = resolve_byprop("type", "EEG", timeout=3)
+    if streams:
+        print("[INFO] Existing EEG LSL stream detected.")
+        return None
+    print("[INFO] No EEG stream found. Searching for Muse device")
+    muses = list_muses()
+    if not muses:
+        raise RuntimeError("No MUSE found.")
+    addr = muses[0]["address"]
+    print(f"[INFO] Launching muselsl stream for {addr}")
+    def run():
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        muse_stream(addr, ppg_enabled=True, acc_enabled=True, gyro_enabled=True)
+    t = threading.Thread(target=run, daemon=True)
+    t.start()
+    for _ in range(int(STREAM_TIMEOUT * 2)):
+        streams = resolve_byprop("type", "EEG", timeout=0.5)
+        if streams:
+            print("[INFO] EEG LSL stream is active.")
+            return t
+        time.sleep(0.5)
+    raise RuntimeError("Failed to start EEG stream.")
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Record EEG and PPG data from MUSE device.")
@@ -35,7 +61,7 @@ def get_muse_address():
 def stream_worker(addr):
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-    stream(addr, ppg_enabled=True, acc_enabled=True, gyro_enabled=True)
+    muse_stream(addr, ppg_enabled=True, acc_enabled=True, gyro_enabled=True)
 
 def launch_muse_stream(address):
     thread = threading.Thread(target=stream_worker, args=(address,), daemon=True)
@@ -81,8 +107,8 @@ def save_data(filename, eeg_data, ppg_data):
 
 def record(duration, emotion_label, output_file=None):
     output_file = output_file or f"{emotion_label}.npz"
-    address = get_muse_address()
-    launch_muse_stream(address)
+    # ensure EEG stream is available before opening inlets
+    stream_thread = ensure_stream()
     eeg_inlet, ppg_inlet = open_inlets()
     eeg_data, ppg_data = collect_data(eeg_inlet, ppg_inlet, duration)
     save_data(output_file, eeg_data, ppg_data)
