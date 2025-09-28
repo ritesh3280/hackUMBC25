@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { formatDuration, formatDate, formatTime, calculateSessionAnalytics } from '../utils/sessionAnalytics';
 import { TimelineChart, PieChart, BarChart, HeatmapChart, SessionHeatmap } from '../components/SessionVisualization';
 import { CalendarView } from '../components/CalendarView';
+import { generateFocusInsights, generateTrendInsights } from '../utils/geminiInsights';
 import Link from 'next/link';
 import Logo from '../components/Logo';
 
@@ -13,10 +14,30 @@ export default function HistoryPage() {
   const [selectedSession, setSelectedSession] = useState(null);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState('calendar'); // 'calendar' or 'list'
+  const [insights, setInsights] = useState(null);
+  const [trendInsights, setTrendInsights] = useState(null);
+  const [loadingInsights, setLoadingInsights] = useState(false);
 
   useEffect(() => {
     loadSessions();
   }, []);
+
+  // Generate insights when sessions are loaded
+  useEffect(() => {
+    if (sessions.length > 0) {
+      generateAllInsights();
+    }
+  }, [sessions]);
+
+  // Generate insights for selected session
+  useEffect(() => {
+    if (selectedSession && sessions.length > 0) {
+      const session = sessions.find(s => s.id === selectedSession.sessionId);
+      if (session) {
+        generateSessionInsights(session);
+      }
+    }
+  }, [selectedSession]);
 
   // Refresh sessions when page becomes visible (in case new session was added)
   useEffect(() => {
@@ -63,6 +84,31 @@ export default function HistoryPage() {
       console.error('Error loading sessions:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const generateAllInsights = async () => {
+    setLoadingInsights(true);
+    try {
+      // Generate trend insights for all sessions
+      const trends = await generateTrendInsights(sessions);
+      setTrendInsights(trends);
+    } catch (error) {
+      console.error('Error generating trend insights:', error);
+    } finally {
+      setLoadingInsights(false);
+    }
+  };
+
+  const generateSessionInsights = async (session) => {
+    setLoadingInsights(true);
+    try {
+      const sessionInsights = await generateFocusInsights(session);
+      setInsights(sessionInsights);
+    } catch (error) {
+      console.error('Error generating session insights:', error);
+    } finally {
+      setLoadingInsights(false);
     }
   };
 
@@ -280,48 +326,147 @@ export default function HistoryPage() {
               <div className="space-y-4">
                 {/* Insights Panel */}
                 <div className="bg-white rounded-lg shadow-sm border p-4">
-                  <h3 className="text-sm font-semibold text-gray-900 mb-3">Focus Insights</h3>
+                  <h3 className="text-sm font-semibold text-gray-900 mb-3">
+                    Focus Insights
+                    {loadingInsights && (
+                      <span className="ml-2 inline-block w-3 h-3 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></span>
+                    )}
+                  </h3>
                   <div className="space-y-3">
-                    <div>
-                      <div className="text-xs text-gray-600">Best Focus Day</div>
-                      <div className="text-base font-bold text-green-600">Wednesday</div>
-                      <div className="text-xs text-gray-500">Average 92% focus</div>
-                    </div>
-                    <div>
-                      <div className="text-xs text-gray-600">Peak Productivity</div>
-                      <div className="text-base font-bold text-blue-600">9:00 AM - 11:00 AM</div>
-                      <div className="text-xs text-gray-500">Most focused time window</div>
-                    </div>
-                    <div>
-                      <div className="text-xs text-gray-600">Weekly Goal</div>
-                      <div className="text-base font-bold text-purple-600">15 / 20 hours</div>
-                      <div className="text-xs text-gray-500">75% completed</div>
-                    </div>
+                    {insights ? (
+                      <>
+                        {/* Show AI-generated insights */}
+                        {insights.insights?.slice(0, 3).map((insight, idx) => (
+                          <div key={idx} className="text-xs">
+                            <div className="text-gray-900 font-medium mb-1">• {insight}</div>
+                          </div>
+                        ))}
+                        {/* Show strengths if available */}
+                        {insights.strengths && insights.strengths.length > 0 && (
+                          <div className="mt-3 p-2 bg-green-50 rounded">
+                            <div className="text-xs font-semibold text-green-900 mb-1">Strengths:</div>
+                            {insights.strengths.map((strength, idx) => (
+                              <div key={idx} className="text-xs text-green-700">✓ {strength}</div>
+                            ))}
+                          </div>
+                        )}
+                        {/* Show improvements if available */}
+                        {insights.improvements && insights.improvements.length > 0 && (
+                          <div className="mt-2 p-2 bg-yellow-50 rounded">
+                            <div className="text-xs font-semibold text-yellow-900 mb-1">Areas to Improve:</div>
+                            {insights.improvements.map((improvement, idx) => (
+                              <div key={idx} className="text-xs text-yellow-700">→ {improvement}</div>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    ) : trendInsights ? (
+                      <>
+                        {/* Show trend insights when no session is selected */}
+                        <div>
+                          <div className="text-xs text-gray-600">Overall Focus</div>
+                          <div className="text-base font-bold text-green-600">{trendInsights.overallAvgFocus}%</div>
+                          <div className="text-xs text-gray-500">Across {trendInsights.totalSessions} sessions</div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-gray-600">Recent Trend</div>
+                          <div className="text-base font-bold text-blue-600">
+                            {trendInsights.trend === 'improving' ? '↑' : trendInsights.trend === 'declining' ? '↓' : '→'} {trendInsights.trend}
+                          </div>
+                          <div className="text-xs text-gray-500">{trendInsights.recentAvgFocus}% recent average</div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-gray-600">Total Focus Time</div>
+                          <div className="text-base font-bold text-purple-600">{formatDuration(trendInsights.totalMinutes * 60)}</div>
+                          <div className="text-xs text-gray-500">Lifetime total</div>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        {/* Fallback to default content */}
+                        <div>
+                          <div className="text-xs text-gray-600">Best Focus Day</div>
+                          <div className="text-base font-bold text-green-600">Wednesday</div>
+                          <div className="text-xs text-gray-500">Average 92% focus</div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-gray-600">Peak Productivity</div>
+                          <div className="text-base font-bold text-blue-600">9:00 AM - 11:00 AM</div>
+                          <div className="text-xs text-gray-500">Most focused time window</div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-gray-600">Weekly Goal</div>
+                          <div className="text-base font-bold text-purple-600">15 / 20 hours</div>
+                          <div className="text-xs text-gray-500">75% completed</div>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
 
                 {/* Recommendations */}
                 <div className="bg-white rounded-lg shadow-sm border p-4">
-                  <h3 className="text-sm font-semibold text-gray-900 mb-3">Recommendations</h3>
+                  <h3 className="text-sm font-semibold text-gray-900 mb-3">
+                    Recommendations
+                    {loadingInsights && (
+                      <span className="ml-2 inline-block w-3 h-3 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></span>
+                    )}
+                  </h3>
                   <div className="space-y-2">
-                    <div className="p-2 bg-blue-50 rounded">
-                      <div className="text-xs font-medium text-blue-900">Schedule Deep Work</div>
-                      <div className="text-xs text-blue-700 mt-0.5">
-                        Your focus peaks at 9-11 AM. Schedule important tasks during this window.
-                      </div>
-                    </div>
-                    <div className="p-2 bg-green-50 rounded">
-                      <div className="text-xs font-medium text-green-900">Maintain Streak</div>
-                      <div className="text-xs text-green-700 mt-0.5">
-                        You&apos;ve had 3 consecutive days with 80%+ focus. Keep it up!
-                      </div>
-                    </div>
-                    <div className="p-2 bg-yellow-50 rounded">
-                      <div className="text-xs font-medium text-yellow-900">Take Breaks</div>
-                      <div className="text-xs text-yellow-700 mt-0.5">
-                        Consider shorter work intervals after 2 PM when focus tends to drop.
-                      </div>
-                    </div>
+                    {insights?.recommendations ? (
+                      <>
+                        {insights.recommendations.slice(0, 3).map((rec, idx) => {
+                          const colors = [
+                            { bg: 'bg-blue-50', text: 'text-blue-900', subtext: 'text-blue-700' },
+                            { bg: 'bg-green-50', text: 'text-green-900', subtext: 'text-green-700' },
+                            { bg: 'bg-yellow-50', text: 'text-yellow-900', subtext: 'text-yellow-700' }
+                          ];
+                          const color = colors[idx % colors.length];
+                          const [title, ...description] = rec.split('. ');
+                          
+                          return (
+                            <div key={idx} className={`p-2 ${color.bg} rounded`}>
+                              <div className={`text-xs font-medium ${color.text}`}>
+                                {title}
+                              </div>
+                              {description.length > 0 && (
+                                <div className={`text-xs ${color.subtext} mt-0.5`}>
+                                  {description.join('. ')}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                        {insights.motivationalMessage && (
+                          <div className="mt-2 p-2 bg-indigo-50 rounded">
+                            <div className="text-xs text-indigo-900 italic">
+                              💪 {insights.motivationalMessage}
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <div className="p-2 bg-blue-50 rounded">
+                          <div className="text-xs font-medium text-blue-900">Schedule Deep Work</div>
+                          <div className="text-xs text-blue-700 mt-0.5">
+                            Your focus peaks at 9-11 AM. Schedule important tasks during this window.
+                          </div>
+                        </div>
+                        <div className="p-2 bg-green-50 rounded">
+                          <div className="text-xs font-medium text-green-900">Maintain Streak</div>
+                          <div className="text-xs text-green-700 mt-0.5">
+                            You&apos;ve had 3 consecutive days with 80%+ focus. Keep it up!
+                          </div>
+                        </div>
+                        <div className="p-2 bg-yellow-50 rounded">
+                          <div className="text-xs font-medium text-yellow-900">Take Breaks</div>
+                          <div className="text-xs text-yellow-700 mt-0.5">
+                            Consider shorter work intervals after 2 PM when focus tends to drop.
+                          </div>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
 
