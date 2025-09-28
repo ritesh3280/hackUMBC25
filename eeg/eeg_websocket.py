@@ -35,6 +35,10 @@ class EEGWebSocketServer:
                 ppg_streams = resolve_byprop('type', 'PPG', timeout=5)
                 self.ppg_inlet = StreamInlet(ppg_streams[0], max_chunklen=256) if ppg_streams else None
                 if self.ppg_inlet:
+                    # Initialize PPG buffer for heart rate calculation
+                    from collections import deque
+                    self.ppg_buffer = deque(maxlen=1000)  # 10 seconds at 100Hz
+                    self.ppg_fs = 100  # PPG sample rate
                     print("✅ PPG inlet ready!")
                 else:
                     print("⚠️  No PPG device connected")
