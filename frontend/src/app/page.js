@@ -2,8 +2,18 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import Logo from './components/Logo';
+import TaskList from './components/TaskList';
+import Timer from './components/Timer';
+import Controls from './components/Controls';
+import FocusPill from './components/FocusPill';
+import SessionStats from './components/SessionStats';
 import { useSessionStore } from './store/sessionStore';
-import { useMockEEG } from './hooks/useMockEEG';
+import { useRealEEG } from './hooks/useRealEEG';
+import EEGGraphs from './components/EEGGraphs';
+import FocusAlarm from './components/FocusAlarm';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts';
+import { useMemo } from 'react';
 
 export default function SessionPage() {
   const {
@@ -23,8 +33,26 @@ export default function SessionPage() {
     switchTask
   } = useSessionStore();
 
-  const { connected, latestSample, subscribe } = useMockEEG();
-  const [newTaskName, setNewTaskName] = useState('');
+  const { connected, latestSample, eegData, heartRate, focusHistory, subscribe } = useRealEEG();
+
+  // Memoize focus data for stable chart rendering with sliding window
+  const focusChartData = useMemo(() => {
+    if (focusHistory.length === 0) return [];
+    
+    // Sliding window: always show last 10 points
+    const windowSize = 10;
+    const startIndex = Math.max(0, focusHistory.length - windowSize);
+    const recentData = focusHistory.slice(startIndex);
+    
+    return recentData.map((point, index) => ({
+      time: index, // Simple index for x-axis
+      timestamp: point.timestamp,
+      focused: point.focused ? 1 : 0,
+      confidence: point.confidence,
+    }));
+  }, [focusHistory]);
+  const [preset, setPreset] = useState('30/10');
+  const [adaptive, setAdaptive] = useState(false);
 
   // Timer tick effect
   useEffect(() => {
@@ -45,25 +73,54 @@ export default function SessionPage() {
     return unsubscribe;
   }, [connected, subscribe, appendSample, timer.mode]);
 
-  const formatTime = (seconds) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyPress = (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      
+      switch (e.key) {
+        case ' ':
+          e.preventDefault();
+          if (timer.mode === 'idle' || timer.mode === 'paused') {
+            startWork();
+          } else {
+            pause();
+          }
+          break;
+        case 'r':
+        case 'R':
+          e.preventDefault();
+          reset();
+          break;
+        case 'n':
+        case 'N':
+          e.preventDefault();
+          // Focus on add task input
+          const addButton = document.querySelector('[title="Add task (N)"]');
+          if (addButton) addButton.click();
+          break;
+        case 'ArrowUp':
+          e.preventDefault();
+          if (tasks.length > 0) {
+            const currentIndex = tasks.findIndex(t => t.id === currentTaskId);
+            const prevIndex = currentIndex > 0 ? currentIndex - 1 : tasks.length - 1;
+            switchTask(tasks[prevIndex].id);
+          }
+          break;
+        case 'ArrowDown':
+          e.preventDefault();
+          if (tasks.length > 0) {
+            const currentIndex = tasks.findIndex(t => t.id === currentTaskId);
+            const nextIndex = currentIndex < tasks.length - 1 ? currentIndex + 1 : 0;
+            switchTask(tasks[nextIndex].id);
+          }
+          break;
+      }
+    };
 
-  const getTimerColor = () => {
-    if (timer.mode === 'work') return 'text-blue-600';
-    if (timer.mode === 'break') return 'text-green-600';
-    if (timer.mode === 'paused') return 'text-orange-600';
-    return 'text-gray-600';
-  };
-
-  const getStatusText = () => {
-    if (timer.mode === 'work') return 'Focus Time';
-    if (timer.mode === 'break') return 'Break Time';
-    if (timer.mode === 'paused') return 'Paused';
-    return 'Ready to Focus';
-  };
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [timer.mode, tasks, currentTaskId, startWork, pause, reset, switchTask]);
 
   const handleStart = () => {
     if (timer.mode === 'idle') {
@@ -79,229 +136,193 @@ export default function SessionPage() {
     }
   };
 
-  const handleAddTask = () => {
-    if (newTaskName.trim()) {
-      addTask(newTaskName.trim());
-      setNewTaskName('');
+  const handleSkipBreak = () => {
+    // Skip break logic
+    console.log('Skip break');
+  };
+
+  const handleSwitchTask = () => {
+    if (tasks.length > 0) {
+      const currentIndex = tasks.findIndex(t => t.id === currentTaskId);
+      const nextIndex = currentIndex < tasks.length - 1 ? currentIndex + 1 : 0;
+      switchTask(tasks[nextIndex].id);
     }
   };
 
+  const handlePresetChange = (newPreset) => {
+    setPreset(newPreset);
+    // Update timer preset logic here
+  };
+
+  const handleAdaptiveChange = (newAdaptive) => {
+    setAdaptive(newAdaptive);
+    // Update adaptive mode logic here
+  };
+
+  // Calculate next break time
+  const nextBreakAt = timer.mode === 'work' ? Date.now() + (timer.remainingSeconds * 1000) : null;
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+    <div className="min-h-screen relative z-10">
       {/* Header */}
-      <div className="bg-white shadow-sm border-b">
-        <div className="max-w-4xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-lg">F</span>
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">FocusFlow</h1>
-                <p className="text-sm text-gray-600">Brain-aware productivity</p>
-              </div>
+      <div className="workspace-card mx-10 mt-4 mb-4">
+        <div className="flex items-center justify-between p-4">
+          {/* Left: Logo + Name */}
+          <Logo />
+          
+          {/* Center: Session breadcrumbs */}
+          <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400">
+            <span>Session</span>
+            <span>&gt;</span>
+            <span>{tasks.length} tasks</span>
+            {currentTaskId && (
+              <>
+                <span>&gt;</span>
+                <span className="text-gray-900 dark:text-white">
+                  {tasks.find(t => t.id === currentTaskId)?.name || 'Unknown'}
+                </span>
+              </>
+            )}
+          </div>
+          
+          {/* Right: Status + Navigation */}
+          <div className="flex items-center space-x-4">
+            {/* EEG Status */}
+            <div className="flex items-center space-x-2">
+              <div className={`w-2 h-2 rounded-full ${connected ? 'bg-success animate-pulse' : 'bg-gray-400'}`}></div>
+              <span className="text-sm text-gray-600 dark:text-gray-400">EEG</span>
             </div>
             
-            <div className="flex items-center space-x-4">
-              {/* EEG Status */}
-              <div className="flex items-center space-x-2">
-                <div className={`w-3 h-3 rounded-full ${connected ? 'bg-green-500' : 'bg-gray-400'}`}></div>
-                <span className="text-sm text-gray-600">EEG</span>
-              </div>
-              
-              {/* Focus Status */}
-              <div className={`px-3 py-1 rounded-full text-sm font-medium ${
-                latestSample?.focused 
-                  ? 'bg-green-100 text-green-800' 
-                  : 'bg-red-100 text-red-800'
-              }`}>
-                {latestSample?.focused ? 'Focused' : 'Unfocused'}
-              </div>
-
-              {/* Quick Actions */}
-              <div className="flex items-center space-x-2">
-                <Link
-                  href="/history"
-                  className="px-3 py-1 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-                >
-                  History
-                </Link>
-                <button className="px-3 py-1 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors">
-                  Settings
-                </button>
-              </div>
+            {/* Focus Status */}
+            <FocusPill isFocused={latestSample?.focused || false} />
+            
+            {/* Navigation */}
+            <div className="flex items-center space-x-2">
+              <Link
+                href="/"
+                className="px-3 py-1 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-all duration-200"
+              >
+                Session
+              </Link>
+              <Link
+                href="/history"
+                className="px-3 py-1 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-all duration-200"
+              >
+                History
+              </Link>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="max-w-4xl mx-auto px-6 py-8">
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto px-6">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           
-          {/* Left Column - Tasks */}
-          <div className="lg:col-span-1">
-            <div className="bg-white rounded-xl shadow-sm border p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Tasks</h2>
-              
-              {/* Add Task */}
-              <div className="flex gap-2 mb-4">
-                <input
-                  type="text"
-                  value={newTaskName}
-                  onChange={(e) => setNewTaskName(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleAddTask()}
-                  placeholder="Add a task..."
-                  className="w-40 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                <button
-                  onClick={handleAddTask}
-                  className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium whitespace-nowrap"
-                >
-                  Add
-                </button>
-              </div>
-
-              {/* Task List */}
-              <div className="space-y-2">
-                {tasks.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500">
-                    <div>No tasks yet</div>
-                    <div className="text-sm mt-1">Add a task to get started</div>
-                  </div>
-                ) : (
-                  tasks.map((task) => (
-                    <div
-                      key={task.id}
-                      className={`flex items-center justify-between p-3 rounded-lg border transition-colors cursor-pointer ${
-                        task.id === currentTaskId
-                          ? 'border-blue-500 bg-blue-50'
-                          : 'border-gray-200 hover:border-gray-300'
-                      }`}
-                      onClick={() => switchTask(task.id)}
-                    >
-                      <div className="flex items-center space-x-3">
-                        <div className={`w-3 h-3 rounded-full ${
-                          task.id === currentTaskId ? 'bg-blue-500' : 'bg-gray-300'
-                        }`} />
-                        <span className={`text-sm ${
-                          task.id === currentTaskId ? 'text-blue-700 font-medium' : 'text-gray-700'
-                        }`}>
-                          {task.name}
-                        </span>
-                      </div>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          removeTask(task.id);
-                        }}
-                        className="text-gray-400 hover:text-red-500 transition-colors p-1"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
+          {/* Left Column - Task Drawer + EEG Graphs */}
+          <div className="lg:col-span-1 space-y-6">
+            <TaskList
+              tasks={tasks}
+              currentTaskId={currentTaskId}
+              onAddTask={addTask}
+              onRemoveTask={removeTask}
+              onSwitchTask={switchTask}
+            />
+            
+            {/* EEG Graphs - Compact Version */}
+            <EEGGraphs 
+              eegData={eegData}
+              heartRate={heartRate}
+              focusHistory={focusHistory}
+            />
           </div>
 
           {/* Center Column - Timer */}
           <div className="lg:col-span-1">
-            <div className="bg-white rounded-xl shadow-sm border p-8 text-center">
-              {/* Timer Display */}
-              <div className="mb-8">
-                <div className={`text-6xl font-mono font-bold ${getTimerColor()}`}>
-                  {formatTime(timer.remainingSeconds)}
-                </div>
-                <div className="text-lg text-gray-600 mt-2">{getStatusText()}</div>
-              </div>
-
-              {/* Progress Bar */}
-              {timer.totalSeconds > 0 && (
-                <div className="mb-8">
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div
-                      className={`h-2 rounded-full transition-all duration-1000 ${
-                        timer.mode === 'work' ? 'bg-blue-500' : 'bg-green-500'
-                      }`}
-                      style={{ width: `${((timer.totalSeconds - timer.remainingSeconds) / timer.totalSeconds) * 100}%` }}
-                    ></div>
-                  </div>
-                </div>
-              )}
-
-              {/* Control Buttons */}
-              <div className="space-y-4">
-                <div className="flex gap-3 justify-center">
-                  {timer.mode === 'idle' || timer.mode === 'paused' ? (
-                    <button
-                      onClick={handleStart}
-                      className="px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-lg"
-                    >
-                      {timer.mode === 'paused' ? 'Resume' : 'Start Focus'}
-                    </button>
-                  ) : (
-                    <button
-                      onClick={handlePause}
-                      className="px-8 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors font-medium text-lg"
-                    >
-                      Pause
-                    </button>
-                  )}
-                </div>
-
-                <div className="flex gap-3 justify-center">
-                  <button
-                    onClick={reset}
-                    className="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors font-medium"
-                  >
-                    Reset
-                  </button>
-                  
-                  {session && (
-                    <button
-                      onClick={endSession}
-                      className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
-                    >
-                      End Session
-                    </button>
-                  )}
-                </div>
-              </div>
+            <Timer
+              remainingSeconds={timer.remainingSeconds}
+              totalSeconds={timer.totalSeconds}
+              mode={timer.mode}
+              nextBreakAt={nextBreakAt}
+            />
+            
+            <div className="mt-6">
+              <Controls
+                mode={timer.mode}
+                onStart={handleStart}
+                onPause={handlePause}
+                onReset={reset}
+                onSkipBreak={handleSkipBreak}
+                onSwitchTask={handleSwitchTask}
+                preset={preset}
+                onPresetChange={handlePresetChange}
+                adaptive={adaptive}
+                onAdaptiveChange={handleAdaptiveChange}
+              />
             </div>
           </div>
 
-          {/* Right Column - Stats */}
-          <div className="lg:col-span-1">
-            <div className="space-y-6">
-              {/* Focus Stats */}
-              <div className="bg-white rounded-xl shadow-sm border p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Focus Stats</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="text-center p-4 bg-green-50 rounded-lg">
-                    <div className="text-2xl font-bold text-green-600">85%</div>
-                    <div className="text-sm text-gray-600">Focus Rate</div>
-                  </div>
-                  <div className="text-center p-4 bg-blue-50 rounded-lg">
-                    <div className="text-2xl font-bold text-blue-600">12m</div>
-                    <div className="text-sm text-gray-600">Best Streak</div>
-                  </div>
-                </div>
+          {/* Right Column - Focus Status + Stats */}
+          <div className="lg:col-span-1 space-y-6">
+            {/* Focus Status - Clean Chart */}
+            <div className="workspace-card p-4">
+              <div className="mb-4">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                  Focus Status
+                </h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  {focusHistory.length > 0 ? 
+                    `${Math.round((focusHistory.filter(d => d.focused).length / focusHistory.length) * 100)}% focused` : 
+                    'No data available'
+                  }
+                </p>
               </div>
-
-              {/* Current Task */}
-              {currentTaskId && (
-                <div className="bg-white rounded-xl shadow-sm border p-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Current Task</h3>
-                  <div className="text-gray-700">
-                    {tasks.find(t => t.id === currentTaskId)?.name || 'Unknown'}
-                  </div>
-                </div>
-              )}
-
+              
+              <div className="h-48">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={focusChartData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                    <XAxis 
+                      dataKey="time" 
+                      stroke="#6b7280"
+                      fontSize={12}
+                      tick={{ fill: '#6b7280' }}
+                      label={{ value: 'Time', position: 'insideBottom', offset: -5 }}
+                    />
+                    <YAxis 
+                      stroke="#6b7280"
+                      fontSize={12}
+                      tick={{ fill: '#6b7280' }}
+                      domain={[0, 1]}
+                      label={{ value: 'Focus Level', angle: -90, position: 'insideLeft' }}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="focused"
+                      stroke="#10b981"
+                      fill="#10b981"
+                      fillOpacity={0.3}
+                      strokeWidth={2}
+                      isAnimationActive={false}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
             </div>
+
+            {/* Hidden Focus Alarm - still works but no visual card */}
+            <FocusAlarm 
+              focusHistory={focusHistory}
+              isEnabled={connected}
+              hidden={true}
+            />
+
+            <SessionStats
+              focusPercentage={85}
+              longestStreak={12}
+              heartRate={heartRate || 72}
+              nextBreakIn={Math.ceil(timer.remainingSeconds / 60)}
+            />
           </div>
         </div>
       </div>

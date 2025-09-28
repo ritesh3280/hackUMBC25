@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 
-export default function TimerRing({ 
+export default function Timer({ 
   remainingSeconds, 
   totalSeconds, 
   mode = 'work',
@@ -31,10 +31,10 @@ export default function TimerRing({
 
   const getModeColor = () => {
     switch (mode) {
-      case 'work': return '#7C3AED';
-      case 'break': return '#22C55E';
-      case 'paused': return '#F59E0B';
-      default: return '#6B7280';
+      case 'work': return 'text-accent';
+      case 'break': return 'text-success';
+      case 'paused': return 'text-warning';
+      default: return 'text-gray-500';
     }
   };
 
@@ -47,70 +47,68 @@ export default function TimerRing({
     }
   };
 
-  const radius = 120;
-  const strokeWidth = 8;
+  const radius = 80;
+  const strokeWidth = 6;
   const normalizedRadius = radius - strokeWidth * 2;
   const circumference = normalizedRadius * 2 * Math.PI;
   const strokeDasharray = `${circumference} ${circumference}`;
   const strokeDashoffset = circumference - (progress / 100) * circumference;
 
   return (
-    <div className="glass-card p-8 text-center">
-      {/* Timer Ring */}
-      <div className="relative w-64 h-64 mx-auto mb-6">
+    <div className="workspace-card p-2 text-center" style={{ minHeight: '300px' }}>
+      {/* Timer Display with Circle */}
+      <div className="relative w-48 h-48 mx-auto mb-2">
         <svg
-          className="w-full h-full transform -rotate-90 timer-ring"
-          width="256"
-          height="256"
+          className="w-full h-full transform -rotate-90"
+          width="192"
+          height="192"
         >
           {/* Background circle */}
           <circle
-            cx="128"
-            cy="128"
+            cx="96"
+            cy="96"
             r={normalizedRadius}
-            stroke="rgba(255, 255, 255, 0.1)"
+            stroke="currentColor"
             strokeWidth={strokeWidth}
             fill="none"
+            className="text-gray-200 dark:text-gray-700"
           />
           {/* Progress circle */}
           <circle
-            cx="128"
-            cy="128"
+            cx="96"
+            cy="96"
             r={normalizedRadius}
-            stroke={getModeColor()}
+            stroke="currentColor"
             strokeWidth={strokeWidth}
             fill="none"
             strokeDasharray={strokeDasharray}
             strokeDashoffset={strokeDashoffset}
             strokeLinecap="round"
-            className="transition-all duration-300 ease-in-out"
-            style={{
-              filter: `drop-shadow(0 0 8px ${getModeColor()}40)`
-            }}
+            className={`timer-ring ${getModeColor()}`}
           />
         </svg>
         
         {/* Center content */}
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <div className="text-4xl font-mono font-bold text-white tabular-nums tracking-tight">
+          <div className={`text-4xl font-mono font-bold ${getModeColor()} mb-1`}>
             {formatTime(remainingSeconds)}
           </div>
-          <div className="text-sm text-white/60 mt-1">
-            {getModeLabel()}
-          </div>
+          <div className="text-sm text-gray-600 dark:text-gray-400">{getModeLabel()}</div>
         </div>
       </div>
 
-      {/* Next break info */}
-      {nextBreakAt && mode === 'work' && (
-        <div className="text-xs text-white/50 mb-4">
-          Next break at {formatNextBreak(nextBreakAt)}
-        </div>
-      )}
+      {/* Next break info - always reserve space */}
+      <div className="text-sm text-gray-500 dark:text-gray-400 mb-4" style={{ minHeight: '20px' }}>
+        {nextBreakAt && mode === 'work' ? (
+          `Next break at ${formatNextBreak(nextBreakAt)}`
+        ) : (
+          <span className="invisible">placeholder</span>
+        )}
+      </div>
 
       {/* Progress percentage */}
       {totalSeconds > 0 && (
-        <div className="text-sm text-white/60">
+        <div className="text-sm text-gray-500 dark:text-gray-400">
           {Math.round(progress)}% complete
         </div>
       )}

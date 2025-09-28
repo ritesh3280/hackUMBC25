@@ -10,8 +10,8 @@ import torch
 import torch.nn.functional as F
 from joblib import load
 from pylsl import StreamInlet, resolve_byprop
-from eeg.model import HemiAttentionLSTM
-from eeg.signal_processing import design_bandpass, filter_eeg_signal, extract_band_powers
+from model import HemiAttentionLSTM
+from signal_processing import design_bandpass, filter_eeg_signal, extract_band_powers
 
 class EEGMoodDetector:
 
