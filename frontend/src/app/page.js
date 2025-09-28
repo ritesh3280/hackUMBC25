@@ -48,7 +48,7 @@ export default function SessionPage() {
       time: index, // Simple index for x-axis
       timestamp: point.timestamp,
       focused: point.focused ? 1 : 0,
-      confidence: point.confidence,
+      confidence: point.confidence * 100,
     }));
   }, [focusHistory]);
   const [preset, setPreset] = useState('30/10');
@@ -271,10 +271,9 @@ export default function SessionPage() {
                   Focus Status
                 </h3>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
-                  {focusHistory.length > 0 ? 
-                    `${Math.round((focusHistory.filter(d => d.focused).length / focusHistory.length) * 100)}% focused` : 
-                    'No data available'
-                  }
+                  {focusHistory.length > 0
+                    ? `${Math.round(focusHistory[focusHistory.length - 1].confidence * 100)}% focus`
+                    : 'No data available'}
                 </p>
               </div>
               
@@ -282,23 +281,24 @@ export default function SessionPage() {
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={focusChartData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                    <XAxis 
-                      dataKey="time" 
+                    <XAxis
+                      dataKey="time"
                       stroke="#6b7280"
                       fontSize={12}
                       tick={{ fill: '#6b7280' }}
                       label={{ value: 'Time', position: 'insideBottom', offset: -5 }}
                     />
-                    <YAxis 
+                    <YAxis
                       stroke="#6b7280"
                       fontSize={12}
                       tick={{ fill: '#6b7280' }}
-                      domain={[0, 1]}
-                      label={{ value: 'Focus Level', angle: -90, position: 'insideLeft' }}
+                      domain={[0, 100]}
+                      tickFormatter={val => `${val}%`}
+                      label={{ value: 'Focus (%)', angle: -90, position: 'insideLeft' }}
                     />
                     <Area
                       type="monotone"
-                      dataKey="focused"
+                      dataKey="confidence"
                       stroke="#10b981"
                       fill="#10b981"
                       fillOpacity={0.3}

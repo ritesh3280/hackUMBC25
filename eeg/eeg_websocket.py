@@ -8,7 +8,7 @@ import asyncio
 import json
 import time
 import websockets
-from inference import EEGMoodDetector
+from randomforestinference import EEGMoodDetector
 from pylsl import StreamInlet, resolve_byprop
 
 class EEGWebSocketServer:
