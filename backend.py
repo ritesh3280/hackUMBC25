@@ -44,6 +44,45 @@ async def stream():
     return StreamingResponse(event_generator(),
                              media_type="text/event-stream")
 
+@app.get("/unified_stream")
+async def unified_stream():
+    async def unified_generator():
+        while not detector.available:
+            await asyncio.sleep(0.1)
+        
+        while True:
+            # Get focus classification
+            label, probs = detector.infer_latest(verbose=False)
+            
+            # Get raw EEG data
+            eeg_sample = None
+            with detector._lock:
+                if detector.buf:
+                    eeg_sample = detector.buf[-1].tolist()
+            
+            # Get heart rate
+            hr = None
+            if ppg_inlet:
+                chunk, _ = ppg_inlet.pull_chunk(timeout=0.1, max_samples=1)
+                if chunk:
+                    hr = float(chunk[0][0])
+            
+            # Combined payload
+            payload = {
+                "timestamp": int(time.time() * 1000),
+                "focus": {
+                    "label": label,
+                    "probabilities": probs
+                },
+                "eeg": eeg_sample,
+                "heart_rate": hr
+            }
+            
+            yield f"data: {json.dumps(payload)}\n\n"
+            await asyncio.sleep(1.0)
+    
+    return StreamingResponse(unified_generator(), media_type="text/event-stream")
+
 @app.get("/raw_eeg")
 async def raw_eeg():
     async def raw_eeg_generator():

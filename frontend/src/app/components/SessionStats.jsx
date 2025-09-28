@@ -1,82 +1,88 @@
-'use client';
-
-import { useSessionStore } from '../store/sessionStore';
-
-export default function SessionStats() {
-  const { session, timer, getCurrentFocusMetrics } = useSessionStore();
-  
-  const metrics = getCurrentFocusMetrics();
-  const taskSwitches = session?.intervals?.[session.intervals.length - 1]?.switches?.length || 0;
-  
-  const getNextBreakTime = () => {
-    if (timer.mode !== 'work') return 'N/A';
-    
-    const now = new Date();
-    const breakTime = new Date(now.getTime() + (timer.remainingSeconds * 1000));
-    return breakTime.toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true
-    });
-  };
-
-  const formatDuration = (seconds) => {
-    if (seconds < 60) return `${seconds}s`;
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return secs > 0 ? `${mins}m ${secs}s` : `${mins}m`;
-  };
-
+export default function SessionStats({ 
+  focusPercentage = 85,
+  longestStreak = 12,
+  heartRate = 72,
+  nextBreakIn = 8
+}) {
   const stats = [
     {
       label: 'Focus %',
-      value: `${metrics.focusPercent}%`,
-      color: 'text-green-600',
-      bgColor: 'bg-green-50 dark:bg-green-900/20',
-      borderColor: 'border-green-200 dark:border-green-800'
+      value: `${focusPercentage}%`,
+      color: 'success',
+      icon: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      )
     },
     {
       label: 'Longest Streak',
-      value: formatDuration(metrics.longestStreak),
-      color: 'text-blue-600',
-      bgColor: 'bg-blue-50 dark:bg-blue-900/20',
-      borderColor: 'border-blue-200 dark:border-blue-800'
+      value: `${longestStreak}m`,
+      color: 'accent',
+      icon: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+        </svg>
+      )
     },
     {
-      label: 'Task Switches',
-      value: taskSwitches.toString(),
-      color: 'text-purple-600',
-      bgColor: 'bg-purple-50 dark:bg-purple-900/20',
-      borderColor: 'border-purple-200 dark:border-purple-800'
+      label: 'Heart Rate',
+      value: `${heartRate} BPM`,
+      color: 'error',
+      icon: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+        </svg>
+      )
     },
     {
       label: 'Next Break',
-      value: getNextBreakTime(),
-      color: 'text-orange-600',
-      bgColor: 'bg-orange-50 dark:bg-orange-900/20',
-      borderColor: 'border-orange-200 dark:border-orange-800'
+      value: `${nextBreakIn}m`,
+      color: 'success',
+      icon: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      )
     }
   ];
 
+  const getColorClasses = (color) => {
+    switch (color) {
+      case 'success': return 'border-success/30 bg-success/5';
+      case 'accent': return 'border-accent/30 bg-accent/5';
+      case 'warning': return 'border-warning/30 bg-warning/5';
+      case 'error': return 'border-error/30 bg-error/5';
+      default: return 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800';
+    }
+  };
+
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-lg border border-border p-6">
-      <h3 className="text-lg font-semibold text-foreground mb-4">Session Stats</h3>
-      
-      <div className="grid grid-cols-2 gap-4">
+    <div className="space-y-4">
+      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
+        <svg className="w-5 h-5 mr-2 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+        </svg>
+        Session Stats
+      </h3>
+
+      <div className="grid grid-cols-2 gap-3">
         {stats.map((stat, index) => (
           <div
             key={index}
-            className={`p-4 rounded-lg border ${stat.bgColor} ${stat.borderColor}`}
+            className={`workspace-card p-4 border transition-all duration-300 hover:shadow-lg hover:scale-105 ${getColorClasses(stat.color)}`}
           >
-            <div className={`text-2xl font-bold ${stat.color} mb-1`}>
-              {stat.value}
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-xs font-medium text-gray-600 dark:text-gray-400">{stat.label}</div>
+              <div className="text-gray-400 dark:text-gray-500">{stat.icon}</div>
             </div>
-            <div className="text-sm text-muted-foreground">
-              {stat.label}
+            <div className="text-2xl font-bold text-gray-900 dark:text-white font-mono">
+              {stat.value}
             </div>
           </div>
         ))}
       </div>
+
     </div>
   );
 }
