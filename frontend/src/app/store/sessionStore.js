@@ -1,9 +1,10 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { saveSession, getSession, getAllSessions, clearAllSessions } from '../db/indexeddb';
+import { classifyTask } from '../utils/taskClassifier';
 
 /**
- * @typedef {{ id: string, name: string, createdAt: number }} Task
+ * @typedef {{ id: string, name: string, createdAt: number, category?: string, confidence?: number }} Task
  * @typedef {"work"|"break"} IntervalKind
  * @typedef {{ t: number, focused: boolean, taskId?: string }} FocusSample
  * @typedef {{
@@ -32,12 +33,43 @@ export const useSessionStore = create(
       timer: { mode: 'idle', remainingSeconds: 0, totalSeconds: 0 },
       presets: { workMin: 25, breakMin: 5, adaptive: false },
 
-      addTask: (name) => {
-        const newTask = { id: crypto.randomUUID(), name, createdAt: Date.now() };
+      addTask: async (name) => {
+        const newTask = { 
+          id: crypto.randomUUID(), 
+          name, 
+          createdAt: Date.now(),
+          category: 'life', // default category
+          confidence: 0,
+          classifying: true // New property
+        };
+        
+        // Add task immediately with default category
         set((state) => ({
           tasks: [...state.tasks, newTask],
           currentTaskId: state.currentTaskId || newTask.id,
         }));
+
+        // Classify task in background and update
+        try {
+          const classification = await classifyTask(name);
+          set((state) => ({
+            tasks: state.tasks.map(task => 
+              task.id === newTask.id 
+                ? { ...task, category: classification.category, confidence: classification.confidence, classifying: false }
+                : task
+            )
+          }));
+        } catch (error) {
+          console.error('Failed to classify task:', error);
+          // Task remains with default category, but we should stop the classifying indicator
+          set((state) => ({
+            tasks: state.tasks.map(task => 
+              task.id === newTask.id 
+                ? { ...task, classifying: false }
+                : task
+            )
+          }));
+        }
       },
 
       removeTask: (id) => {

@@ -1,13 +1,13 @@
 @import "tailwindcss";
 
 :root {
-  /* Light theme - Notion-inspired */
+  /* Light theme - Clean and modern */
   --bg: #fafafa;
   --card: #ffffff;
-  --border: #e5e5e5;
-  --text: #1a1a1a;
+  --border: #e5e7eb;
+  --text: #111827;
   --text-muted: #6b7280;
-  --accent: #6366f1;
+  --accent: #3b82f6;
   --success: #10b981;
   --warning: #f59e0b;
   --error: #ef4444;
@@ -85,33 +85,33 @@ body::before {
 
 /* Button styles */
 .btn-primary {
-  background: var(--accent);
+  background: #3b82f6;
   color: white;
   border: none;
-  border-radius: 0.375rem;
+  border-radius: 0.5rem;
   padding: 0.5rem 1rem;
   font-weight: 500;
   transition: all 200ms ease-out;
 }
 
 .btn-primary:hover {
-  background: #5856eb;
+  background: #2563eb;
   transform: translateY(-1px);
 }
 
 .btn-secondary {
-  background: var(--card);
-  color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: 0.375rem;
+  background: white;
+  color: #374151;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
   padding: 0.5rem 1rem;
   font-weight: 500;
   transition: all 200ms ease-out;
 }
 
 .btn-secondary:hover {
-  background: var(--bg);
-  border-color: var(--accent);
+  background: #f9fafb;
+  border-color: #3b82f6;
 }
 
 /* Timer ring */

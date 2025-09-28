@@ -163,60 +163,62 @@ export default function SessionPage() {
   const nextBreakAt = timer.mode === 'work' ? Date.now() + (timer.remainingSeconds * 1000) : null;
 
   return (
-    <div className="min-h-screen relative z-10">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       {/* Header */}
-      <div className="workspace-card mx-10 mt-4 mb-4">
-        <div className="flex items-center justify-between p-4">
-          {/* Left: Logo + Name */}
-          <Logo />
+      <div className="bg-white shadow-sm border-b">
+        <div className="max-w-7xl mx-auto px-6 py-4">
+          <div className="flex items-center justify-between">
+            {/* Left: Logo + Name */}
+            <Logo />
           
-          {/* Center: Session breadcrumbs */}
-          <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400">
-            <span>Session</span>
-            <span>&gt;</span>
-            <span>{tasks.length} tasks</span>
-            {currentTaskId && (
-              <>
-                <span>&gt;</span>
-                <span className="text-gray-900 dark:text-white">
-                  {tasks.find(t => t.id === currentTaskId)?.name || 'Unknown'}
-                </span>
-              </>
-            )}
-          </div>
-          
-          {/* Right: Status + Navigation */}
-          <div className="flex items-center space-x-4">
-            {/* EEG Status */}
-            <div className="flex items-center space-x-2">
-              <div className={`w-2 h-2 rounded-full ${connected ? 'bg-success animate-pulse' : 'bg-gray-400'}`}></div>
-              <span className="text-sm text-gray-600 dark:text-gray-400">EEG</span>
+            {/* Center: Session breadcrumbs */}
+            <div className="flex items-center space-x-2 text-sm text-gray-600">
+              <span>Session</span>
+              <span>&gt;</span>
+              <span>{tasks.length} tasks</span>
+              {currentTaskId && (
+                <>
+                  <span>&gt;</span>
+                  <span className="text-gray-900 font-medium">
+                    {tasks.find(t => t.id === currentTaskId)?.name || 'Unknown'}
+                  </span>
+                </>
+              )}
             </div>
             
-            {/* Focus Status */}
-            <FocusPill isFocused={latestSample?.focused || false} />
-            
-            {/* Navigation */}
-            <div className="flex items-center space-x-2">
-              <Link
-                href="/"
-                className="px-3 py-1 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-all duration-200"
-              >
-                Session
-              </Link>
-              <Link
-                href="/history"
-                className="px-3 py-1 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-all duration-200"
-              >
-                History
-              </Link>
+            {/* Right: Status + Navigation */}
+            <div className="flex items-center space-x-4">
+              {/* EEG Status */}
+              <div className="flex items-center space-x-2">
+                <div className={`w-2 h-2 rounded-full ${connected ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></div>
+                <span className="text-sm text-gray-600">EEG</span>
+              </div>
+              
+              {/* Focus Status */}
+              <FocusPill isFocused={latestSample?.focused || false} />
+              
+              {/* Navigation */}
+              <div className="flex items-center space-x-3">
+                <Link
+                  href="/"
+                  className="px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
+                >
+                  Session
+                </Link>
+                <Link
+                  href="/history"
+                  className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  History
+                </Link>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-6">
+      <div className="max-w-7xl mx-auto px-6 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           
           {/* Left Column - Task Drawer + EEG Graphs */}
@@ -320,7 +322,7 @@ export default function SessionPage() {
             <SessionStats
               focusPercentage={85}
               longestStreak={12}
-              heartRate={heartRate || 72}
+              heartRate={heartRate}
               nextBreakIn={Math.ceil(timer.remainingSeconds / 60)}
             />
           </div>

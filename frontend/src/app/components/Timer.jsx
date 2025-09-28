@@ -31,9 +31,9 @@ export default function Timer({
 
   const getModeColor = () => {
     switch (mode) {
-      case 'work': return 'text-accent';
-      case 'break': return 'text-success';
-      case 'paused': return 'text-warning';
+      case 'work': return 'text-blue-600';
+      case 'break': return 'text-green-600';
+      case 'paused': return 'text-yellow-600';
       default: return 'text-gray-500';
     }
   };
@@ -55,7 +55,7 @@ export default function Timer({
   const strokeDashoffset = circumference - (progress / 100) * circumference;
 
   return (
-    <div className="workspace-card p-2 text-center" style={{ minHeight: '300px' }}>
+    <div className="bg-white rounded-lg shadow-sm border p-6 text-center" style={{ minHeight: '300px' }}>
       {/* Timer Display with Circle */}
       <div className="relative w-48 h-48 mx-auto mb-2">
         <svg

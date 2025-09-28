@@ -1,241 +1,576 @@
 'use client';
 
+import { useState, useEffect } from 'react';
+import { getAllSessions } from '../db/indexeddb';
+import { generateHardcodedSessions, calculateSessionAnalytics, formatDuration, formatDate, formatTime } from '../utils/sessionAnalytics';
+import { TimelineChart, PieChart, BarChart, HeatmapChart, SessionHeatmap } from '../components/SessionVisualization';
+import { CalendarView } from '../components/CalendarView';
 import Link from 'next/link';
 import Logo from '../components/Logo';
 
 export default function HistoryPage() {
-  // Mock data for demonstration
-  const sessionSummary = {
-    totalSessions: 24,
-    totalFocusTime: '18h 32m',
-    averageFocus: 78,
-    bestStreak: '2h 15m'
-  };
+  const [sessions, setSessions] = useState([]);
+  const [analytics, setAnalytics] = useState([]);
+  const [selectedSession, setSelectedSession] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [viewMode, setViewMode] = useState('calendar'); // 'calendar' or 'list'
 
-  const recentSessions = [
-    {
-      id: 1,
-      date: '2024-01-15',
-      duration: '2h 15m',
-      focusPercentage: 85,
-      taskCount: 4,
-      tasks: ['Design System', 'API Integration', 'Testing', 'Documentation']
-    },
-    {
-      id: 2,
-      date: '2024-01-14',
-      duration: '1h 45m',
-      focusPercentage: 72,
-      taskCount: 3,
-      tasks: ['User Research', 'Wireframes', 'Prototyping']
-    },
-    {
-      id: 3,
-      date: '2024-01-13',
-      duration: '3h 20m',
-      focusPercentage: 91,
-      taskCount: 5,
-      tasks: ['Database Design', 'Backend API', 'Frontend Components', 'Authentication', 'Deployment']
-    },
-    {
-      id: 4,
-      date: '2024-01-12',
-      duration: '1h 30m',
-      focusPercentage: 68,
-      taskCount: 2,
-      tasks: ['Code Review', 'Bug Fixes']
-    },
-    {
-      id: 5,
-      date: '2024-01-11',
-      duration: '2h 45m',
-      focusPercentage: 88,
-      taskCount: 3,
-      tasks: ['Feature Planning', 'Architecture Design', 'Team Sync']
+  useEffect(() => {
+    loadSessions();
+  }, []);
+
+  const loadSessions = async () => {
+    try {
+      // For now, use hardcoded data - replace with real data later
+      const hardcodedSessions = generateHardcodedSessions();
+      const allSessions = [...hardcodedSessions];
+      
+      // Calculate analytics for each session
+      const sessionAnalytics = allSessions.map(session => calculateSessionAnalytics(session));
+      
+      setSessions(allSessions);
+      setAnalytics(sessionAnalytics);
+      
+      // Don't auto-select any session - let user click to open popup
+      // setSelectedSession(null) is already the default
+    } catch (error) {
+      console.error('Error loading sessions:', error);
+    } finally {
+      setLoading(false);
     }
-  ];
-
-  const focusData = {
-    focused: 70,
-    unfocused: 30
   };
+
+  const getOverallStats = () => {
+    if (analytics.length === 0) return { totalSessions: 0, avgFocus: 0, totalTime: 0 };
+    
+    const totalSessions = analytics.length;
+    const avgFocus = analytics.reduce((sum, a) => sum + a.focusPercentage, 0) / totalSessions;
+    const totalTime = analytics.reduce((sum, a) => sum + a.totalWorkTime, 0);
+    
+    return { totalSessions, avgFocus, totalTime };
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <div className="text-gray-600">Loading sessions...</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen relative z-10">
-      {/* Header */}
-      <div className="workspace-card mx-6 mt-6 mb-8">
-        <div className="flex items-center justify-between p-6">
-          <Logo />
-          
-          <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400">
-            <span>History</span>
-            <span>•</span>
-            <span>{sessionSummary.totalSessions} sessions</span>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+      <div className="bg-white shadow-sm border-b">
+        <div className="max-w-7xl mx-auto px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">Session History</h1>
+              <p className="text-sm text-gray-600 mt-1">Track your focus progress over time</p>
+            </div>
+            <div className="flex items-center space-x-3">
+              {/* View Mode Toggle */}
+              <div className="flex bg-gray-100 rounded-lg p-1">
+                <button
+                  onClick={() => setViewMode('calendar')}
+                  className={`px-3 py-1.5 text-sm font-medium rounded transition-colors ${
+                    viewMode === 'calendar'
+                      ? 'bg-white text-gray-900 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  Calendar
+                </button>
+                <button
+                  onClick={() => setViewMode('list')}
+                  className={`px-3 py-1.5 text-sm font-medium rounded transition-colors ${
+                    viewMode === 'list'
+                      ? 'bg-white text-gray-900 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  List
+                </button>
+              </div>
+              <Link
+                href="/"
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+              >
+                Back to Session
+              </Link>
+            </div>
           </div>
-          
-          <div className="flex items-center space-x-2">
+        </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-6 py-8">
+        {analytics.length === 0 ? (
+          <div className="text-center py-16">
+            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+            </div>
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">No sessions yet</h2>
+            <p className="text-gray-600 mb-6">Start your first focus session to see your progress here</p>
             <Link
               href="/"
-              className="px-3 py-1 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-all duration-200"
+              className="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
             >
-              Session
-            </Link>
-            <Link
-              href="/history"
-              className="px-3 py-1 text-sm text-gray-900 dark:text-white bg-gray-100 dark:bg-gray-800 rounded-lg transition-all duration-200"
-            >
-              History
+              Start First Session
             </Link>
           </div>
-        </div>
-      </div>
-
-      {/* Hero Header with Session Summary */}
-      <div className="max-w-7xl mx-auto px-6 mb-8">
-        <div className="glass-card p-8">
-          <h1 className="text-3xl font-bold text-white mb-6">Session History</h1>
-          
-          {/* Summary Chips */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="glass-card p-4 border border-purple-500/30">
-              <div className="text-2xl font-bold text-purple-500 font-mono">{sessionSummary.totalSessions}</div>
-              <div className="text-sm text-white/60">Total Sessions</div>
-            </div>
-            <div className="glass-card p-4 border border-green-500/30">
-              <div className="text-2xl font-bold text-green-500 font-mono">{sessionSummary.totalFocusTime}</div>
-              <div className="text-sm text-white/60">Focus Time</div>
-            </div>
-            <div className="glass-card p-4 border border-yellow-500/30">
-              <div className="text-2xl font-bold text-yellow-500 font-mono">{sessionSummary.averageFocus}%</div>
-              <div className="text-sm text-white/60">Avg Focus</div>
-            </div>
-            <div className="glass-card p-4 border border-green-500/30">
-              <div className="text-2xl font-bold text-green-500 font-mono">{sessionSummary.bestStreak}</div>
-              <div className="text-sm text-white/60">Best Streak</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Analytics Grid */}
-      <div className="max-w-7xl mx-auto px-6">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          
-          {/* Focus vs Unfocused Donut Chart */}
-          <div className="workspace-card p-6">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6 flex items-center">
-              <svg className="w-5 h-5 mr-2 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" />
-              </svg>
-              Focus Distribution
-            </h3>
-            
-            <div className="relative w-48 h-48 mx-auto mb-6">
-              <svg className="w-full h-full transform -rotate-90" viewBox="0 0 200 200">
-                {/* Background circle */}
-                <circle
-                  cx="100"
-                  cy="100"
-                  r="80"
-                  stroke="rgba(255, 255, 255, 0.1)"
-                  strokeWidth="16"
-                  fill="none"
-                />
-                {/* Focused segment */}
-                <circle
-                  cx="100"
-                  cy="100"
-                  r="80"
-                  stroke="#22C55E"
-                  strokeWidth="16"
-                  fill="none"
-                  strokeDasharray={`${2 * Math.PI * 80 * (focusData.focused / 100)} ${2 * Math.PI * 80}`}
-                  strokeDashoffset="0"
-                  strokeLinecap="round"
-                  className="transition-all duration-1000"
-                />
-                {/* Unfocused segment */}
-                <circle
-                  cx="100"
-                  cy="100"
-                  r="80"
-                  stroke="#EF4444"
-                  strokeWidth="16"
-                  fill="none"
-                  strokeDasharray={`${2 * Math.PI * 80 * (focusData.unfocused / 100)} ${2 * Math.PI * 80}`}
-                  strokeDashoffset={`-${2 * Math.PI * 80 * (focusData.focused / 100)}`}
-                  strokeLinecap="round"
-                  className="transition-all duration-1000"
-                />
-              </svg>
-              
-              {/* Center text */}
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <div className="text-3xl font-bold text-white font-mono">{focusData.focused}%</div>
-                <div className="text-sm text-white/60">Focused</div>
-              </div>
-            </div>
-            
-            {/* Legend */}
-            <div className="flex justify-center space-x-6 text-sm">
-              <div className="flex items-center space-x-2">
-                <div className="w-3 h-3 bg-success rounded-full"></div>
-                <span className="text-gray-600 dark:text-gray-400">Focused ({focusData.focused}%)</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <div className="w-3 h-3 bg-error rounded-full"></div>
-                <span className="text-gray-600 dark:text-gray-400">Unfocused ({focusData.unfocused}%)</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Sessions Table */}
-          <div className="workspace-card p-6">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6 flex items-center">
-              <svg className="w-5 h-5 mr-2 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-              </svg>
-              Recent Sessions
-            </h3>
-            
-            <div className="space-y-3">
-              {recentSessions.map((session) => (
-                <div
-                  key={session.id}
-                  className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-200"
-                >
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-4 mb-2">
-                      <div className="text-sm font-mono text-gray-700 dark:text-gray-300">
-                        {new Date(session.date).toLocaleDateString()}
+        ) : viewMode === 'calendar' ? (
+          // Calendar View
+          <div className="space-y-4">
+            {/* Overview Stats - Smaller */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {(() => {
+                const stats = getOverallStats();
+                return (
+                  <>
+                    <div className="bg-white rounded-lg shadow-sm border p-3">
+                      <div className="text-lg font-bold text-gray-900">{stats.totalSessions}</div>
+                      <div className="text-xs text-gray-600">Total Sessions</div>
+                    </div>
+                    <div className="bg-white rounded-lg shadow-sm border p-3">
+                      <div className="text-lg font-bold text-green-600">{Math.round(stats.avgFocus)}%</div>
+                      <div className="text-xs text-gray-600">Average Focus</div>
+                    </div>
+                    <div className="bg-white rounded-lg shadow-sm border p-3">
+                      <div className="text-lg font-bold text-blue-600">{formatDuration(stats.totalTime)}</div>
+                      <div className="text-xs text-gray-600">Total Focus Time</div>
+                    </div>
+                    <div className="bg-white rounded-lg shadow-sm border p-3">
+                      <div className="text-lg font-bold text-purple-600">
+                        {selectedSession ? Math.round(selectedSession.longestFocusStreak / 60) : 0}m
                       </div>
-                      <div className="text-sm text-gray-600 dark:text-gray-400">
-                        {session.duration}
+                      <div className="text-xs text-gray-600">Best Focus Streak</div>
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+
+            {/* Main Layout Grid - 2/3 Calendar, 1/3 Insights */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              {/* Calendar Section - 2/3 width */}
+              <div className="lg:col-span-2 space-y-6">
+                <div className="relative">
+                <CalendarView 
+                  sessions={sessions}
+                  analytics={analytics}
+                  onSessionSelect={setSelectedSession}
+                />
+
+                {/* Session Details Popup Overlay */}
+                {selectedSession && (
+                  <>
+                    {/* Backdrop with blur */}
+                    <div 
+                      className="absolute inset-0 z-40 backdrop-blur-sm bg-white/30"
+                      onClick={() => setSelectedSession(null)}
+                    />
+                    
+                    {/* Popup Modal */}
+                    <div className="absolute inset-0 z-50 flex items-center justify-center p-6 pointer-events-none">
+                      <div className="bg-white rounded-2xl shadow-xl border border-gray-200 p-6 max-w-xl w-full max-h-[85vh] overflow-y-auto pointer-events-auto transform transition-all duration-200 scale-100">
+                        <div className="flex items-center justify-between mb-5">
+                          <div>
+                            <h3 className="text-lg font-semibold text-gray-900">
+                              Session Details
+                            </h3>
+                            <p className="text-sm text-gray-500 mt-0.5">
+                              {formatDate(sessions.find(s => s.id === selectedSession.sessionId)?.startedAt)} at {formatTime(sessions.find(s => s.id === selectedSession.sessionId)?.startedAt)}
+                            </p>
+                          </div>
+                          <button
+                            onClick={() => setSelectedSession(null)}
+                            className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-1.5 rounded-lg transition-colors"
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        </div>
+
+                      {/* Core Metrics Grid */}
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                        <div className="text-center p-3 bg-gray-50 rounded-lg">
+                          <div className="text-lg font-bold text-gray-900">{formatDuration(selectedSession.totalWorkTime)}</div>
+                          <div className="text-xs text-gray-600">Total Time</div>
+                        </div>
+                        <div className="text-center p-3 bg-green-50 rounded-lg">
+                          <div className="text-lg font-bold text-green-600">{formatDuration(selectedSession.totalFocusedTime)}</div>
+                          <div className="text-xs text-gray-600">Focused Time</div>
+                        </div>
+                        <div className="text-center p-3 bg-red-50 rounded-lg">
+                          <div className="text-lg font-bold text-red-600">{formatDuration(selectedSession.totalDistractedTime)}</div>
+                          <div className="text-xs text-gray-600">Distracted Time</div>
+                        </div>
+                        <div className="text-center p-3 bg-blue-50 rounded-lg">
+                          <div className="text-lg font-bold text-blue-600">{selectedSession.focusPercentage}%</div>
+                          <div className="text-xs text-gray-600">Focus Rate</div>
+                        </div>
                       </div>
-                      <div className="text-sm text-gray-600 dark:text-gray-400">
-                        {session.taskCount} tasks
+
+                        {/* Visualizations */}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                          <div>
+                            <SessionHeatmap 
+                              focusArray={selectedSession.focusArray}
+                            />
+                          </div>
+                          <div className="space-y-4">
+                            <div>
+                              <h4 className="text-sm font-medium text-gray-700 mb-3">Time Distribution</h4>
+                              <PieChart 
+                                focusedTime={selectedSession.totalFocusedTime}
+                                distractedTime={selectedSession.totalDistractedTime}
+                              />
+                            </div>
+                            <TimelineChart 
+                              timelineData={selectedSession.timelineData} 
+                              totalDuration={selectedSession.totalWorkTime}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Streak Analysis */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mt-5 pt-5 border-t">
+                          <div className="space-y-3">
+                            <h4 className="font-medium text-gray-700">Focus Streaks</h4>
+                            <div className="space-y-2">
+                              <div className="flex justify-between text-sm">
+                                <span className="text-gray-600">Longest Streak</span>
+                                <span className="font-semibold text-gray-900">{formatDuration(selectedSession.longestFocusStreak)}</span>
+                              </div>
+                              <div className="flex justify-between text-sm">
+                                <span className="text-gray-600">Average Streak</span>
+                                <span className="font-semibold text-gray-900">{formatDuration(selectedSession.averageFocusStreak)}</span>
+                              </div>
+                              <div className="flex justify-between text-sm">
+                                <span className="text-gray-600">Total Streaks</span>
+                                <span className="font-semibold text-gray-900">{selectedSession.focusStreaks.length}</span>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="space-y-3">
+                            <h4 className="font-medium text-gray-700">Distraction Analysis</h4>
+                            <div className="space-y-2">
+                              <div className="flex justify-between text-sm">
+                                <span className="text-gray-600">Longest Distraction</span>
+                                <span className="font-semibold text-gray-900">{formatDuration(selectedSession.longestDistractionStreak)}</span>
+                              </div>
+                              <div className="flex justify-between text-sm">
+                                <span className="text-gray-600">Average Recovery</span>
+                                <span className="font-semibold text-gray-900">{formatDuration(selectedSession.averageRecoveryTime)}</span>
+                              </div>
+                              <div className="flex justify-between text-sm">
+                                <span className="text-gray-600">State Transitions</span>
+                                <span className="font-semibold text-gray-900">{selectedSession.stateTransitions}</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     </div>
-                    <div className="text-xs text-gray-500 dark:text-gray-500">
-                      {session.tasks.join(' • ')}
+                  </>
+                )}
+                </div>
+
+              </div>
+
+              {/* Right Sidebar - 1/3 width (Insights and Recommendations only) - Smaller */}
+              <div className="space-y-4">
+                {/* Insights Panel */}
+                <div className="bg-white rounded-lg shadow-sm border p-4">
+                  <h3 className="text-sm font-semibold text-gray-900 mb-3">Focus Insights</h3>
+                  <div className="space-y-3">
+                    <div>
+                      <div className="text-xs text-gray-600">Best Focus Day</div>
+                      <div className="text-base font-bold text-green-600">Wednesday</div>
+                      <div className="text-xs text-gray-500">Average 92% focus</div>
                     </div>
-                  </div>
-                  
-                  <div className="flex items-center space-x-3">
-                    <div className="text-right">
-                      <div className="text-sm font-bold text-gray-900 dark:text-white">
-                        {session.focusPercentage}%
-                      </div>
-                      <div className="text-xs text-gray-600 dark:text-gray-400">Focus</div>
+                    <div>
+                      <div className="text-xs text-gray-600">Peak Productivity</div>
+                      <div className="text-base font-bold text-blue-600">9:00 AM - 11:00 AM</div>
+                      <div className="text-xs text-gray-500">Most focused time window</div>
                     </div>
-                    <div className={`w-3 h-3 rounded-full ${
-                      session.focusPercentage >= 80 ? 'bg-success' :
-                      session.focusPercentage >= 60 ? 'bg-warning' : 'bg-error'
-                    }`}></div>
+                    <div>
+                      <div className="text-xs text-gray-600">Weekly Goal</div>
+                      <div className="text-base font-bold text-purple-600">15 / 20 hours</div>
+                      <div className="text-xs text-gray-500">75% completed</div>
+                    </div>
                   </div>
                 </div>
-              ))}
+
+                {/* Recommendations */}
+                <div className="bg-white rounded-lg shadow-sm border p-4">
+                  <h3 className="text-sm font-semibold text-gray-900 mb-3">Recommendations</h3>
+                  <div className="space-y-2">
+                    <div className="p-2 bg-blue-50 rounded">
+                      <div className="text-xs font-medium text-blue-900">Schedule Deep Work</div>
+                      <div className="text-xs text-blue-700 mt-0.5">
+                        Your focus peaks at 9-11 AM. Schedule important tasks during this window.
+                      </div>
+                    </div>
+                    <div className="p-2 bg-green-50 rounded">
+                      <div className="text-xs font-medium text-green-900">Maintain Streak</div>
+                      <div className="text-xs text-green-700 mt-0.5">
+                        You've had 3 consecutive days with 80%+ focus. Keep it up!
+                      </div>
+                    </div>
+                    <div className="p-2 bg-yellow-50 rounded">
+                      <div className="text-xs font-medium text-yellow-900">Take Breaks</div>
+                      <div className="text-xs text-yellow-700 mt-0.5">
+                        Consider shorter work intervals after 2 PM when focus tends to drop.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* This Week Stats */}
+                <div className="bg-white rounded-lg shadow-sm border p-4">
+                  <h3 className="text-sm font-semibold text-gray-900 mb-3">This Week</h3>
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs text-gray-600">Sessions</span>
+                      <span className="text-xs font-semibold">12</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs text-gray-600">Total Focus Time</span>
+                      <span className="text-xs font-semibold">8h 45m</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs text-gray-600">Avg Session Length</span>
+                      <span className="text-xs font-semibold">43 min</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs text-gray-600">Focus Improvement</span>
+                      <span className="text-xs font-semibold text-green-600">+12%</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          // List View (existing code)
+          <div className="space-y-8">
+            {/* Overview Stats */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              {(() => {
+                const stats = getOverallStats();
+                return (
+                  <>
+                    <div className="bg-white rounded-xl shadow-sm border p-6">
+                      <div className="text-2xl font-bold text-gray-900">{stats.totalSessions}</div>
+                      <div className="text-sm text-gray-600">Total Sessions</div>
+                    </div>
+                    <div className="bg-white rounded-xl shadow-sm border p-6">
+                      <div className="text-2xl font-bold text-green-600">{Math.round(stats.avgFocus)}%</div>
+                      <div className="text-sm text-gray-600">Average Focus</div>
+                    </div>
+                    <div className="bg-white rounded-xl shadow-sm border p-6">
+                      <div className="text-2xl font-bold text-blue-600">{formatDuration(stats.totalTime)}</div>
+                      <div className="text-sm text-gray-600">Total Focus Time</div>
+                    </div>
+                    <div className="bg-white rounded-xl shadow-sm border p-6">
+                      <div className="text-2xl font-bold text-purple-600">
+                        {selectedSession ? Math.round(selectedSession.longestFocusStreak / 60) : 0}m
+                      </div>
+                      <div className="text-sm text-gray-600">Best Focus Streak</div>
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+
+            {/* Main Content Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              {/* Sessions List */}
+              <div className="lg:col-span-2 space-y-6">
+                {/* Session Details */}
+                {selectedSession && (
+                  <div className="bg-white rounded-xl shadow-sm border p-6">
+                    <div className="flex items-center justify-between mb-6">
+                      <h3 className="text-lg font-semibold text-gray-900">
+                        Session Details - {formatDate(sessions.find(s => s.id === selectedSession.sessionId)?.startedAt)}
+                      </h3>
+                      <div className="text-sm text-gray-500">
+                        {formatTime(sessions.find(s => s.id === selectedSession.sessionId)?.startedAt)}
+                      </div>
+                    </div>
+
+                    {/* Core Metrics Grid */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                      <div className="text-center p-3 bg-gray-50 rounded-lg">
+                        <div className="text-lg font-bold text-gray-900">{formatDuration(selectedSession.totalWorkTime)}</div>
+                        <div className="text-xs text-gray-600">Total Time</div>
+                      </div>
+                      <div className="text-center p-3 bg-green-50 rounded-lg">
+                        <div className="text-lg font-bold text-green-600">{formatDuration(selectedSession.totalFocusedTime)}</div>
+                        <div className="text-xs text-gray-600">Focused Time</div>
+                      </div>
+                      <div className="text-center p-3 bg-red-50 rounded-lg">
+                        <div className="text-lg font-bold text-red-600">{formatDuration(selectedSession.totalDistractedTime)}</div>
+                        <div className="text-xs text-gray-600">Distracted Time</div>
+                      </div>
+                      <div className="text-center p-3 bg-blue-50 rounded-lg">
+                        <div className="text-lg font-bold text-blue-600">{selectedSession.focusPercentage}%</div>
+                        <div className="text-xs text-gray-600">Focus Rate</div>
+                      </div>
+                    </div>
+
+                    {/* Timeline Visualization */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                      <TimelineChart 
+                        timelineData={selectedSession.timelineData} 
+                        totalDuration={selectedSession.totalWorkTime}
+                      />
+                      <SessionHeatmap 
+                        focusArray={selectedSession.focusArray}
+                      />
+                    </div>
+
+                    {/* Streak Analysis */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                      <div className="space-y-3">
+                        <h4 className="font-medium text-gray-700">Focus Streaks</h4>
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-600">Longest Streak</span>
+                            <span className="font-semibold text-gray-900">{formatDuration(selectedSession.longestFocusStreak)}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-600">Average Streak</span>
+                            <span className="font-semibold text-gray-900">{formatDuration(selectedSession.averageFocusStreak)}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-600">Total Streaks</span>
+                            <span className="font-semibold text-gray-900">{selectedSession.focusStreaks.length}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="space-y-3">
+                        <h4 className="font-medium text-gray-700">Distraction Analysis</h4>
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-600">Longest Distraction</span>
+                            <span className="font-semibold text-gray-900">{formatDuration(selectedSession.longestDistractionStreak)}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-600">Average Recovery</span>
+                            <span className="font-semibold text-gray-900">{formatDuration(selectedSession.averageRecoveryTime)}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-600">State Transitions</span>
+                            <span className="font-semibold text-gray-900">{selectedSession.stateTransitions}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Sessions List */}
+                <div className="bg-white rounded-xl shadow-sm border">
+                  <div className="p-6 border-b">
+                    <h2 className="text-xl font-semibold text-gray-900">Session History</h2>
+                    <p className="text-sm text-gray-600 mt-1">{analytics.length} sessions completed</p>
+                  </div>
+                  
+                  <div className="divide-y max-h-96 overflow-y-auto">
+                    {analytics.map((sessionAnalytic, index) => {
+                      const session = sessions.find(s => s.id === sessionAnalytic.sessionId);
+                      const isSelected = selectedSession?.sessionId === sessionAnalytic.sessionId;
+                      
+                      return (
+                        <div 
+                          key={sessionAnalytic.sessionId} 
+                          className={`p-4 hover:bg-gray-50 transition-colors cursor-pointer ${
+                            isSelected ? 'bg-blue-50 border-l-4 border-blue-500' : ''
+                          }`}
+                          onClick={() => setSelectedSession(sessionAnalytic)}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-3">
+                              <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-semibold ${
+                                isSelected ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-600'
+                              }`}>
+                                #{analytics.length - index}
+                              </div>
+                              <div>
+                                <div className="font-medium text-gray-900 text-sm">
+                                  {formatDate(session?.startedAt)} at {formatTime(session?.startedAt)}
+                                </div>
+                                <div className="text-xs text-gray-600">
+                                  {formatDuration(sessionAnalytic.totalWorkTime)} • {sessionAnalytic.workIntervals} intervals
+                                </div>
+                              </div>
+                            </div>
+                            
+                            <div className="text-right">
+                              <div className={`text-lg font-semibold ${
+                                sessionAnalytic.focusPercentage >= 80 ? 'text-green-600' :
+                                sessionAnalytic.focusPercentage >= 60 ? 'text-yellow-600' : 'text-red-600'
+                              }`}>
+                                {Math.round(sessionAnalytic.focusPercentage)}%
+                              </div>
+                              <div className="text-xs text-gray-500">Focus</div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* Sidebar Visualizations */}
+              <div className="space-y-6">
+                {/* Pie Chart */}
+                {selectedSession && (
+                  <div className="bg-white rounded-xl shadow-sm border p-6">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Time Distribution</h3>
+                    <PieChart 
+                      focusedTime={selectedSession.totalFocusedTime}
+                      distractedTime={selectedSession.totalDistractedTime}
+                    />
+                  </div>
+                )}
+
+                {/* Focus Trends */}
+                <div className="bg-white rounded-xl shadow-sm border p-6">
+                  <BarChart sessions={analytics} />
+                </div>
+
+                {/* Heatmap */}
+                <div className="bg-white rounded-xl shadow-sm border p-6">
+                  <HeatmapChart sessions={sessions} />
+                </div>
+
+                {/* Quick Actions */}
+                <div className="bg-white rounded-xl shadow-sm border p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
+                  <div className="space-y-2">
+                    <Link
+                      href="/"
+                      className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
+                    >
+                      Start New Session
+                    </Link>
+                    <button className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg transition-colors">
+                      Export Data
+                    </button>
+                    <button className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg transition-colors">
+                      Clear History
+                    </button>
+                  </div>
+                </div>
             </div>
             
             {/* Load more button */}
@@ -246,6 +581,7 @@ export default function HistoryPage() {
             </div>
           </div>
         </div>
+        )}
       </div>
     </div>
   );

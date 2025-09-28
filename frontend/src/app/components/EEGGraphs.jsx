@@ -26,12 +26,12 @@ export default function EEGGraphs({ eegData, heartRate, focusHistory }) {
   return (
     <div className="space-y-4">
       {/* Clean EEG Chart */}
-      <div className="workspace-card p-4">
+      <div className="bg-white rounded-lg shadow-sm border p-4">
         <div className="mb-4">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">
             Brain Activity
           </h3>
-          <p className="text-sm text-gray-600 dark:text-gray-400">
+          <p className="text-sm text-gray-600">
             Real-time EEG signals from 5 channels
           </p>
         </div>
